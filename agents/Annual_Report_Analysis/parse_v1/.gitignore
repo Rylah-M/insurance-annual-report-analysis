@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.DS_Store
+data/uploads/
+data/mineru_work/
+data/mineru_api_output/
+data/logs/
+output/
+test_output/

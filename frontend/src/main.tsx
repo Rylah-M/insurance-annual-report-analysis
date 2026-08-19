@@ -1,0 +1,147 @@
+import React, { useEffect, useState } from "react";
+import ReactDOM from "react-dom/client";
+import {
+  AlertCircle,
+  BarChart3,
+  Bot,
+  FileOutput,
+  FileSearch,
+  Home,
+  KeyRound,
+  MessageCircle,
+  ScrollText,
+  UploadCloud
+} from "lucide-react";
+import "antd/dist/reset.css";
+import "./styles.css";
+import { api, Indicator, Metadata } from "./api/request";
+import { Analysis } from "./pages/Analysis";
+import { AutoReport } from "./pages/AutoReport";
+import { Chat } from "./pages/Chat";
+import { Dashboard } from "./pages/Dashboard";
+import { Extraction } from "./pages/Extraction";
+import { Report } from "./pages/Report";
+import { Settings } from "./pages/Settings";
+import { UploadReport } from "./pages/UploadReport";
+
+type PageKey =
+  | "overview"
+  | "upload"
+  | "analysis"
+  | "report"
+  | "autoReport"
+  | "chat"
+  | "extraction"
+  | "settings";
+
+const navItems = [
+  { key: "overview" as const, label: "项目总览", icon: Home },
+  { key: "upload" as const, label: "上传年报", icon: UploadCloud },
+  { key: "extraction" as const, label: "指标提取", icon: FileSearch },
+  { key: "analysis" as const, label: "数据分析", icon: BarChart3 },
+  { key: "report" as const, label: "业务分析", icon: ScrollText },
+  { key: "autoReport" as const, label: "自动报告", icon: FileOutput },
+  { key: "chat" as const, label: "智能问答", icon: MessageCircle },
+  { key: "settings" as const, label: "模型设置", icon: KeyRound }
+];
+
+function App() {
+  const [page, setPage] = useState<PageKey>("overview");
+  const [activeTaskId, setActiveTaskId] = useState("");
+  const [metadata, setMetadata] = useState<Metadata | null>(null);
+  const [companies, setCompanies] = useState<string[]>([]);
+  const [years, setYears] = useState<number[]>([]);
+  const [quarters, setQuarters] = useState<string[]>([]);
+  const [indicators, setIndicators] = useState<Indicator[]>([]);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    Promise.all([api.metadata(), api.companies(), api.years(), api.quarters(), api.indicators()])
+      .then(([meta, companyList, yearList, quarterList, indicatorList]) => {
+        setMetadata(meta);
+        setCompanies(companyList);
+        setYears(yearList);
+        setQuarters(quarterList);
+        setIndicators(indicatorList);
+      })
+      .catch((err) => setError(err.message));
+  }, []);
+
+  return (
+    <div className="app-shell">
+      <aside className="sidebar">
+        <div className="brand">
+          <Bot size={26} />
+          <div>
+            <strong>年报分析 Agent</strong>
+            <span>财险上市公司</span>
+          </div>
+        </div>
+        <nav>
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              <button
+                className={page === item.key ? "active" : ""}
+                key={item.key}
+                onClick={() => setPage(item.key)}
+                title={item.label}
+              >
+                <Icon size={18} />
+                <span>{item.label}</span>
+              </button>
+            );
+          })}
+        </nav>
+      </aside>
+
+      <main className="content">
+        {error && (
+          <div className="error-banner">
+            <AlertCircle size={18} />
+            <span>{error}</span>
+          </div>
+        )}
+        {page === "overview" && <Dashboard metadata={metadata} onNavigate={(target) => setPage(target as PageKey)} />}
+        {page === "upload" && (
+          <UploadReport
+            onExtractionStarted={(taskId) => {
+              setActiveTaskId(taskId);
+              setPage("extraction");
+            }}
+          />
+        )}
+        {page === "analysis" && (
+          <Analysis companies={companies} years={years} quarters={quarters} indicators={indicators} />
+        )}
+        {page === "report" && (
+          <Report companies={companies} years={years} indicators={indicators} />
+        )}
+        {page === "autoReport" && (
+          <AutoReport companies={companies} years={years} />
+        )}
+        <Chat active={page === "chat"} />
+        {page === "extraction" && (
+          <Extraction key={activeTaskId || "none"} taskId={activeTaskId || "none"} />
+        )}
+        {page === "settings" && <Settings />}
+      </main>
+    </div>
+  );
+}
+
+function Placeholder({ title, text }: { title: string; text: string }) {
+  return (
+    <section className="page">
+      <header>
+        <p>{title}</p>
+        <h1>{title}</h1>
+      </header>
+      <section className="panel placeholder">
+        <p>{text}</p>
+      </section>
+    </section>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")!).render(<App />);

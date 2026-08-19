@@ -1,0 +1,33 @@
+.env
+.venv/
+__pycache__/
+*.pyc
+node_modules/
+dist/
+.pnpm-store/
+.DS_Store
+
+# 密钥与本地配置
+data/llm_settings.json
+data/*.log
+data/mineru_api_output/
+
+# 运行产物与上传的年报 PDF
+tasks/
+output/
+output_chunks/
+agents/**/data/
+agents/**/md/
+agents/**/indicator/
+agents/**/database_result/
+
+data/*.db
+data/parse_tasks.json
+data/tasks/
+backend/report/analysis_reports/
+agents/**/parse_v1/data/uploads/
+agents/**/parse_v1/data/mineru_api_output/
+agents/**/parse_v1/output/
+agents/**/output/
+agents/**/chunk/
+agents/**/__pycache__/

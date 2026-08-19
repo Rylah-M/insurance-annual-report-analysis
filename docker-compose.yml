@@ -1,0 +1,15 @@
+services:
+  agent:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: insurance-report-agent
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./backend/report/analysis_reports:/app/backend/report/analysis_reports
+      - ./agents:/app/agents
+    environment:
+      - DATABASE_SYNC_ENABLED=1
+    restart: unless-stopped
