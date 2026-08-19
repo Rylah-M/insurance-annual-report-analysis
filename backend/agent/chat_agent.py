@@ -8,6 +8,7 @@ from typing import Any
 import pandas as pd
 
 from data_loader import load_database
+from agent.chunk_index import retrieve_chunks
 
 
 COMPANY_ALIASES = {
@@ -16,6 +17,8 @@ COMPANY_ALIASES = {
     "中国平安": ["平安", "中国平安", "平安产险", "平安财险"],
     "中国太平": ["太平", "中国太平", "太平财险"],
     "中国人寿": ["国寿", "中国人寿", "人寿保险"],
+    "中国阳光": ["阳光", "中国阳光", "阳光财险", "阳光产险"],
+    "众安在线": ["众安", "众安在线", "众安财险"],
 }
 
 CATEGORY_KEYWORDS = {
@@ -45,10 +48,20 @@ ANALYSIS_SYSTEM_PROMPT = (
     "不要按指标逐条罗列。\n"
     "3. 每个要点 = 变化方向 + 数据佐证 + 一句话业务解读（这个变化意味着什么）。\n"
     "4. 重点讲结构性变化：车险/非车险占比变动、各险种增速差异、同比变化、市场份额。\n"
-    "5. 只使用上下文中的数据；没有对比数据时明确说明“未提供该年数据”，"
+    "5. 数值与同比一律以【逐年指标】【同比变化】为准，不要用检索原文里的数字"
+    "代替数据库口径。\n"
+    "6. 叙述性内容（经营方针、变化原因、管理层解读、市场环境、风险因素）"
+    "以【年报原文（知识库检索）】为准，并在引用时标注出处"
+    "（如：年报·管理层讨论与分析）。\n"
+    "7. 用户追问具体原因/方针时，先直接回答方针或原因本身"
+    "（如“高质量发展”“五篇大文章”“优化业务结构”等），"
+    "再用数据与原文佐证，不要只罗列数据或复述上一轮内容。\n"
+    "8. 若知识库未检索到相关原文，明确说明“年报原文知识库中未找到相关表述”，"
+    "不要编造方针或原因。\n"
+    "9. 只使用上下文中的数据；没有对比数据时明确说明“未提供该年数据”，"
     "不要推算或编造。\n"
-    "6. 涉及金额时请按单位换算成亿元表述（100百万元 = 1亿元）。\n"
-    "7. 全文 200-400 字，可用小标题和要点，但不要超过 4 个要点。\n"
+    "10. 涉及金额时请按单位换算成亿元表述（100百万元 = 1亿元）。\n"
+    "11. 全文 200-400 字，可用小标题和要点，但不要超过 4 个要点。\n"
     "例外：如果用户明确问某个具体指标数值（如“综合成本率是多少”），"
     "则直接回答数值、单位和口径，不展开分析。"
 )
@@ -253,7 +266,9 @@ def _analysis_data(df, company: str | None, year: int | None) -> dict[str, Any]:
     }
 
 
-def _format_analysis_context(data: dict[str, Any], question: str) -> str:
+def _format_analysis_context(
+    data: dict[str, Any], question: str, chunks: list[dict[str, Any]] | None = None
+) -> str:
     company = data["company"] or "全部公司"
     years = data["years"]
     by_indicator = data["by_indicator"]
@@ -297,9 +312,22 @@ def _format_analysis_context(data: dict[str, Any], question: str) -> str:
                 lines.append(f"- {indicator}：" + "；".join(cells))
 
     if data["excerpts"]:
-        lines.append("\n【年报原文摘录】")
+        lines.append("\n【数据库原文摘录】")
         for text in data["excerpts"]:
             lines.append(f"- {text}")
+
+    if chunks:
+        lines.append("\n【年报原文（知识库检索）】")
+        lines.append(
+            "以下段落按相关度从高到低排列，"
+            "叙述性内容（方针、原因、管理层解读）优先引用并标注出处："
+        )
+        for index, chunk in enumerate(chunks, 1):
+            origin = (
+                f"{chunk.get('company')} {chunk.get('year')}年 "
+                f"{chunk.get('quarter')} {chunk.get('market')}·{chunk.get('section')}"
+            )
+            lines.append(f"[{index}]（{origin}）{chunk.get('excerpt', '')}")
 
     return "\n".join(lines)
 
@@ -466,7 +494,8 @@ def answer_question(question: str) -> dict[str, Any]:
 
     if analysis_mode:
         data = _analysis_data(df, company, year)
-        context = _format_analysis_context(data, question)
+        chunks = retrieve_chunks(question, company=company, year=year, top_k=5)
+        context = _format_analysis_context(data, question, chunks)
         answer = _call_llm(question, context, analysis_mode=True)
         if not answer:
             answer = _analysis_fallback(data)
@@ -474,6 +503,19 @@ def answer_question(question: str) -> dict[str, Any]:
         if not records:
             records = _metric_records(df, company, None, None)
         source_records = records[:8]
+        chunk_sources = [
+            {
+                "company": chunk.get("company"),
+                "year": chunk.get("year"),
+                "quarter": chunk.get("quarter"),
+                "market": chunk.get("market"),
+                "section": chunk.get("section"),
+                "title": chunk.get("title"),
+                "excerpt": chunk.get("excerpt"),
+                "score": chunk.get("score"),
+            }
+            for chunk in chunks
+        ]
     else:
         records = _metric_records(df, company, year, indicator)
         all_records = _metric_records(df, None, year, indicator)
@@ -485,6 +527,7 @@ def answer_question(question: str) -> dict[str, Any]:
             else:
                 answer = _direct_answer(question, company, year, records, all_records)
         source_records = (records or all_records)[:8]
+        chunk_sources = []
 
     sources = [
         {
@@ -503,6 +546,7 @@ def answer_question(question: str) -> dict[str, Any]:
         "question": question,
         "answer": answer,
         "source": sources,
+        "chunk_sources": chunk_sources,
         "context": {
             "company": company,
             "year": year,
