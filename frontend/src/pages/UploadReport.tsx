@@ -210,6 +210,28 @@ export function UploadReport() {
     }
   };
 
+  const handleSaveAndImport = async () => {
+    if (!taskId) return;
+    setImporting(true);
+    setError("");
+    setSavedMsg("");
+    try {
+      await api.saveExtractionResult(taskId, editedRows);
+      await api.importExtraction(taskId);
+      setStatus((current) =>
+        current
+          ? { ...current, database_imported: true, database_path: "已写入" }
+          : current
+      );
+      setSavedMsg("修改已保存并更新到数据库。");
+      refreshTasks();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const updateRow = (index: number, field: string, value: string) => {
     setEditedRows((current) =>
       current.map((row, i) => (i === index ? { ...row, [field]: value } : row))
@@ -408,11 +430,11 @@ export function UploadReport() {
             </button>
             <button
               className="primary-action"
-              onClick={handleImport}
-              disabled={importing || imported}
+              onClick={imported ? handleSaveAndImport : handleImport}
+              disabled={importing || saving}
             >
               {importing ? <Loader2 className="spin" size={18} /> : <Database size={18} />}
-              {imported ? "已写入数据库" : "写入数据库"}
+              {imported ? "保存修改并更新数据库" : "写入数据库"}
             </button>
           </div>
 

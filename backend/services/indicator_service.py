@@ -101,12 +101,6 @@ def import_database_for_task(task_id: str) -> dict[str, Any]:
     task = get_task(task_id) or {}
     if task.get("status") != "success" or not task.get("result_rows"):
         raise RuntimeError("任务尚未完成提取，无法写入数据库")
-    if task.get("database_imported") and task.get("database_path"):
-        return {
-            "task_id": task_id,
-            "status": "imported",
-            "database_path": task.get("database_path", ""),
-        }
     db_path = update_database_from_csv()
     update_task(
         task_id,
