@@ -120,6 +120,26 @@ def infer_business_type(indicator_name):
     return ""
 
 
+def normalize_business_scope(scope):
+    """统一业务范围口径：财险→财险，集团/合并→集团，其他保留原文作为特殊标注。"""
+    if not scope:
+        return ""
+    text = str(scope).strip()
+    property_markers = (
+        "财险", "产险", "财产保险", "财产险", "財險", "產險", "財產保險",
+        "property insurance", "非寿险", "非壽險",
+    )
+    group_markers = (
+        "集团", "合并", "母公司", "总公司", "整体", "全集团", "集團", "合併",
+        "group",
+    )
+    if any(marker in text for marker in property_markers):
+        return "财险"
+    if any(marker in text for marker in group_markers):
+        return "集团"
+    return text
+
+
 def find_source_chunk(item, chunks):
 
     source_text = str(item.get("source_text", "")).strip()
@@ -174,7 +194,7 @@ def build_database_rows(extracted_results, chunks):
                 "indicator_standard_name": indicator_name,
                 "indicator_value": item.get("indicator_value", ""),
                 "unit": item.get("unit", ""),
-                "business_scope": item.get("business_scope", ""),
+                "business_scope": normalize_business_scope(item.get("business_scope", "")),
                 "business_type": infer_business_type(indicator_name),
                 "source_file": source_file,
                 "source_page": source_page,

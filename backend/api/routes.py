@@ -696,6 +696,24 @@ def indicator_result(task_id: str) -> dict[str, Any]:
         }
     tag = task.get("output_name", "")
     results = read_result(tag)
+
+    def normalize_business_scope(scope: Any) -> str:
+        if not scope:
+            return ""
+        text = str(scope).strip()
+        property_markers = (
+            "财险", "产险", "财产保险", "财产险", "財險", "產險", "財產保險",
+            "property insurance", "非寿险", "非壽險",
+        )
+        group_markers = (
+            "集团", "合并", "母公司", "总公司", "整体", "全集团", "集團", "合併", "group",
+        )
+        if any(marker in text for marker in property_markers):
+            return "财险"
+        if any(marker in text for marker in group_markers):
+            return "集团"
+        return text
+
     rows = []
     for item in results:
         rows.append(
@@ -708,7 +726,9 @@ def indicator_result(task_id: str) -> dict[str, Any]:
                 "indicator_name": item.get("indicator_name", ""),
                 "indicator_value": item.get("indicator_value", ""),
                 "unit": item.get("unit", ""),
-                "business_scope": item.get("business_scope", ""),
+                "business_scope": normalize_business_scope(
+                    item.get("business_scope", "")
+                ),
                 "source_text": item.get("source_text", ""),
                 "confidence_score": item.get("confidence_score", ""),
                 "review_status": item.get("review_status", "待审核"),
