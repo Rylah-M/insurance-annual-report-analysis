@@ -429,11 +429,11 @@ export function UploadReport() {
               保存修改
             </button>
             <button
-              className="primary-action"
+              className="primary-action compact"
               onClick={imported ? handleSaveAndImport : handleImport}
               disabled={importing || saving}
             >
-              {importing ? <Loader2 className="spin" size={18} /> : <Database size={18} />}
+              {importing ? <Loader2 className="spin" size={16} /> : null}
               {imported ? "保存修改并更新数据库" : "写入数据库"}
             </button>
           </div>

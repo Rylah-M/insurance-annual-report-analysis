@@ -203,6 +203,14 @@ nav button:hover {
   background: #175cd3;
 }
 
+.primary-action.compact {
+  height: 32px;
+  min-height: 32px;
+  padding: 0 12px;
+  font-size: 13px;
+  line-height: 1;
+}
+
 button:disabled {
   opacity: 0.65;
   cursor: not-allowed;
@@ -861,9 +869,11 @@ select {
 }
 
 .ghost-action.compact {
+  height: 32px;
   min-height: 32px;
   padding: 0 10px;
   font-size: 13px;
+  line-height: 1;
 }
 
 .ghost-action.db-on {
