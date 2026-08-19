@@ -426,7 +426,6 @@ export function UploadReport() {
                     <th>指标</th>
                     <th>数值</th>
                     <th>单位</th>
-                    <th>置信度</th>
                     <th>业务范围</th>
                     <th>审核状态</th>
                   </tr>
@@ -454,7 +453,6 @@ export function UploadReport() {
                           onChange={(event) => updateRow(index, "unit", event.target.value)}
                         />
                       </td>
-                      <td>{row.confidence_score !== "" ? row.confidence_score : "-"}</td>
                       <td>
                         <input
                           className="table-input"
