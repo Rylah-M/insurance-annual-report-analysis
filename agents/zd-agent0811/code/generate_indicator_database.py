@@ -125,6 +125,9 @@ def normalize_business_scope(scope):
     if not scope:
         return ""
     text = str(scope).strip()
+    if any(marker in text for marker in ("（", "）", "(", ")", "【", "】")):
+        # 带括号的属于特别说明（如“财险（不包含信农险）”），保留原文。
+        return text
     property_markers = (
         "财险", "产险", "财产保险", "财产险", "財險", "產險", "財產保險",
         "property insurance", "非寿险", "非壽險",

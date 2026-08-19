@@ -701,6 +701,8 @@ def indicator_result(task_id: str) -> dict[str, Any]:
         if not scope:
             return ""
         text = str(scope).strip()
+        if any(marker in text for marker in ("（", "）", "(", ")", "【", "】")):
+            return text
         property_markers = (
             "财险", "产险", "财产保险", "财产险", "財險", "產險", "財產保險",
             "property insurance", "非寿险", "非壽險",
