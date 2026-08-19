@@ -198,7 +198,7 @@ for item in data:
 
 
 # ==========================
-# 每个指标保留Top5
+# 每个指标保留Top8
 # ==========================
 
 result = []
@@ -216,7 +216,7 @@ for indicator, items in indicator_groups.items():
     )
 
 
-    top_items = items[:5]
+    top_items = items[:8]
 
 
     result.extend(top_items)

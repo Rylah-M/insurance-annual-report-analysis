@@ -1,6 +1,7 @@
 import json
 import os
 import sys
+from collections import defaultdict
 from io import StringIO
 
 import pandas as pd
@@ -102,6 +103,26 @@ DOMAIN_TAILS = [
     "充足率",
     "准备金",
 ]
+
+
+# 相关指标扩散：细分/下级指标候选不足时，从上级或同族指标召回结果中扩散。
+# 例如"车险综合成本率"依赖"综合成本率"的表头列 + "车险"行，
+# 表格格式不规范时关键词可能只命中上级指标，这里把上级命中的 chunk 补进下级。
+RELATED_INDICATORS = {
+    "车险综合成本率": ["综合成本率"],
+    "非车险综合成本率": ["综合成本率"],
+    "综合赔付率": ["综合成本率"],
+    "综合费用率": ["综合成本率"],
+    "车险保费收入": ["原保险保费收入"],
+    "非车险保费收入": ["原保险保费收入"],
+    "农业保险保费": ["原保险保费收入"],
+    "健康险保费": ["原保险保费收入"],
+    "车险业务占比": ["原保险保费收入"],
+    "非车险业务占比": ["原保险保费收入"],
+    "车险保险服务收入": ["保险服务收入"],
+    "非车保险服务收入": ["保险服务收入"],
+    "非车非保证险保费": ["非车险保费收入", "原保险保费收入"],
+}
 
 
 def keyword_matches(keyword, text, ntext):
@@ -215,7 +236,39 @@ for indicator in indicators:
                 })
 
                 break
+# ======================
+# 相关指标候选扩散
+# ======================
 
+by_indicator = defaultdict(list)
+
+for item in results:
+    by_indicator[item["indicator_name"]].append(item)
+
+extra_items = []
+
+for target, related in RELATED_INDICATORS.items():
+
+    existing_ids = {item["chunk_id"] for item in by_indicator.get(target, [])}
+
+    for rel in related:
+
+        for item in by_indicator.get(rel, []):
+
+            if item["chunk_id"] not in existing_ids:
+
+                new_item = dict(item)
+
+                new_item["indicator_name"] = target
+
+                new_item["matched_keyword"] = f"扩散自:{rel}"
+
+                extra_items.append(new_item)
+
+                existing_ids.add(item["chunk_id"])
+
+
+results.extend(extra_items)
 
 
 # ======================
@@ -237,5 +290,6 @@ with open(
 
 
 print("指标召回完成")
-print("匹配数量:",len(results))
+print("匹配数量:", len(results))
+print("扩散补入数量:", len(extra_items))
 print("输出:",output_file)
