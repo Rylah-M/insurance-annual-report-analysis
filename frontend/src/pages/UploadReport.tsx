@@ -41,10 +41,13 @@ export function UploadReport() {
   const [taskId, setTaskId] = useState("");
   const [status, setStatus] = useState<ReportTaskStatus | null>(null);
   const [result, setResult] = useState<ExtractionResult | null>(null);
+  const [editedRows, setEditedRows] = useState<Array<Record<string, unknown>>>([]);
   const [uploading, setUploading] = useState(false);
   const [cancelling, setCancelling] = useState(false);
   const [importing, setImporting] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [savedMsg, setSavedMsg] = useState("");
   const timerRef = useRef<number | null>(null);
 
   const stopPolling = () => {
@@ -95,7 +98,13 @@ export function UploadReport() {
         ) {
           stopPolling();
           if (next.status === "success") {
-            api.extractionResult(id).then(setResult).catch(() => undefined);
+            api
+              .extractionResult(id)
+              .then((data) => {
+                setResult(data);
+                setEditedRows(data.rows);
+              })
+              .catch(() => undefined);
           }
         }
       } catch (err) {
@@ -201,6 +210,27 @@ export function UploadReport() {
     }
   };
 
+  const updateRow = (index: number, field: string, value: string) => {
+    setEditedRows((current) =>
+      current.map((row, i) => (i === index ? { ...row, [field]: value } : row))
+    );
+  };
+
+  const handleSaveEdits = async () => {
+    if (!taskId) return;
+    setSaving(true);
+    setError("");
+    setSavedMsg("");
+    try {
+      await api.saveExtractionResult(taskId, editedRows);
+      setSavedMsg("修改已保存，写入数据库时将使用编辑后的结果。");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const watchTask = (id: string) => {
     setTaskId(id);
     setStatus(null);
@@ -213,7 +243,7 @@ export function UploadReport() {
   const failed = status?.status === "failed";
   const cancelled = status?.status === "cancelled";
   const currentStage = status?.stage ?? "";
-  const rows = result?.rows ?? [];
+  const rows = editedRows.length > 0 ? editedRows : (result?.rows ?? []);
 
   return (
     <section className="page">
@@ -372,6 +402,10 @@ export function UploadReport() {
           <div className="task-title">
             <h2>提取结果</h2>
             <span className="muted">{rows.length} 条记录</span>
+            <button className="ghost-action compact" onClick={handleSaveEdits} disabled={saving}>
+              {saving ? <Loader2 className="spin" size={16} /> : null}
+              保存修改
+            </button>
             <button
               className="primary-action"
               onClick={handleImport}
@@ -381,6 +415,8 @@ export function UploadReport() {
               {imported ? "已写入数据库" : "写入数据库"}
             </button>
           </div>
+
+          {savedMsg && <p className="progress-caption">{savedMsg}</p>}
 
           {rows.length > 0 ? (
             <div className="compare-table-wrap">
@@ -392,6 +428,7 @@ export function UploadReport() {
                     <th>单位</th>
                     <th>置信度</th>
                     <th>业务范围</th>
+                    <th>审核状态</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -401,10 +438,46 @@ export function UploadReport() {
                         <strong>{row.indicator_name}</strong>
                         <small className="table-sub">{row.indicator_id}</small>
                       </td>
-                      <td>{row.indicator_value || "-"}</td>
-                      <td>{row.unit || "-"}</td>
+                      <td>
+                        <input
+                          className="table-input"
+                          value={String(row.indicator_value ?? "")}
+                          onChange={(event) =>
+                            updateRow(index, "indicator_value", event.target.value)
+                          }
+                        />
+                      </td>
+                      <td>
+                        <input
+                          className="table-input"
+                          value={String(row.unit ?? "")}
+                          onChange={(event) => updateRow(index, "unit", event.target.value)}
+                        />
+                      </td>
                       <td>{row.confidence_score !== "" ? row.confidence_score : "-"}</td>
-                      <td>{row.business_scope || "-"}</td>
+                      <td>
+                        <input
+                          className="table-input"
+                          value={String(row.business_scope ?? "")}
+                          onChange={(event) =>
+                            updateRow(index, "business_scope", event.target.value)
+                          }
+                        />
+                      </td>
+                      <td>
+                        <select
+                          className="table-input"
+                          value={String(row.review_status ?? "待审核")}
+                          onChange={(event) =>
+                            updateRow(index, "review_status", event.target.value)
+                          }
+                        >
+                          <option value="待审核">待审核</option>
+                          <option value="已审核">已审核</option>
+                          <option value="需修改">需修改</option>
+                          <option value="不采用">不采用</option>
+                        </select>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

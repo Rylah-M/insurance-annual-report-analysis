@@ -182,7 +182,7 @@ def build_database_rows(extracted_results, chunks):
                 "source_text": item.get("source_text", ""),
                 "extraction_time": extraction_time,
                 "confidence_score": item.get("confidence_score", ""),
-                "review_status": "待审核",
+                "review_status": item.get("review_status") or "待审核",
             }
         )
 

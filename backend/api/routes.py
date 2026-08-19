@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import json
 from pathlib import Path
 from uuid import uuid4
 from typing import Any
@@ -20,6 +21,7 @@ from agent.report_agent import REPORT_DIR, build_report_data, generate_report_fi
 from database import get_db_path, list_reports, save_report_artifact
 from data_loader import dataframe_profile, load_database, records_for_json
 from services.indicator_service import (
+    OUTPUT_DIR,
     import_database_for_task,
     read_result,
     start_extraction_background,
@@ -709,6 +711,7 @@ def indicator_result(task_id: str) -> dict[str, Any]:
                 "business_scope": item.get("business_scope", ""),
                 "source_text": item.get("source_text", ""),
                 "confidence_score": item.get("confidence_score", ""),
+                "review_status": item.get("review_status", "待审核"),
             }
         )
     return {
@@ -720,6 +723,29 @@ def indicator_result(task_id: str) -> dict[str, Any]:
         "market": task.get("market", ""),
         "rows": rows,
     }
+
+
+@router.post("/indicator/result/{task_id}")
+def save_indicator_result(
+    task_id: str,
+    payload: dict[str, Any] = Body(...),
+) -> dict[str, Any]:
+    task = get_task(task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    rows = payload.get("rows")
+    if not isinstance(rows, list):
+        raise HTTPException(status_code=400, detail="rows 必须为数组")
+    tag = task.get("output_name", "")
+    if not tag:
+        raise HTTPException(status_code=400, detail="任务缺少 output_name")
+    path = OUTPUT_DIR / f"extracted_indicator_result_{tag}.json"
+    path.write_text(
+        json.dumps(rows, ensure_ascii=False, indent=4),
+        encoding="utf-8",
+    )
+    append_log(task_id, f"已保存人工编辑结果，共 {len(rows)} 条")
+    return {"task_id": task_id, "status": "saved", "rows": len(rows)}
 
 
 @router.get("/report/tasks")

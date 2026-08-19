@@ -331,6 +331,7 @@ export type ExtractionResult = {
     business_scope: string;
     source_text: string;
     confidence_score: string;
+    review_status?: string;
   }>;
 };
 
@@ -455,6 +456,14 @@ export const api = {
     requestJson<{ task_id: string; status: string; database_path?: string }>(
       `/api/indicator/import/${taskId}`,
       {}
+    ),
+  saveExtractionResult: (
+    taskId: string,
+    rows: Array<Record<string, unknown>>
+  ) =>
+    requestJson<{ task_id: string; status: string; rows: number }>(
+      `/api/indicator/result/${taskId}`,
+      { rows }
     ),
   extractionResult: (taskId: string) =>
     request<ExtractionResult>(`/api/indicator/result/${taskId}`),

@@ -1172,6 +1172,17 @@ select {
   font-size: 12px;
 }
 
+.table-input {
+  width: 100%;
+  min-width: 90px;
+  border: 1px solid #d0d7e2;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #101828;
+  padding: 6px 8px;
+  font-size: 13px;
+}
+
 .source-list {
   display: grid;
   gap: 10px;
