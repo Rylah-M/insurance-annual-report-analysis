@@ -63,6 +63,23 @@ def rank_metric(metric_df: pd.DataFrame, indicator_name: str) -> list[dict[str, 
     if available.empty:
         return []
 
+    # 同一公司同一年可能有多条报告期记录（如 Q2/Q4），
+    # 只保留一个代表行：优先 Q4 全年，其次 Q2 半年，最后其他口径；
+    # 同口径取置信度更高者，避免排名出现重复公司。
+    def period_class(row: pd.Series) -> int:
+        period = str(row.get("report_period") or "").upper()
+        if period.endswith("Q4"):
+            return 0
+        if period.endswith("Q2"):
+            return 1
+        return 2
+
+    available["_period"] = [period_class(row) for _, row in available.iterrows()]
+    available["confidence_score"] = available["confidence_score"].fillna(0)
+    available = available.sort_values(
+        ["_period", "confidence_score"], ascending=[True, False]
+    ).drop_duplicates(subset=["company", "year"], keep="first")
+
     ascending = is_lower_better(indicator_name)
     available = available.sort_values(
         ["indicator_value", "company"], ascending=[ascending, True]
