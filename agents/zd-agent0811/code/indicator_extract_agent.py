@@ -2,6 +2,7 @@ from openai import OpenAI
 import os
 import json
 import sys
+import ast
 from collections import defaultdict
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -15,7 +16,7 @@ from tag_utils import resolve_tag, OUTPUT_DIR
 
 client = OpenAI(
     api_key=os.getenv("OPENAI_API_KEY"),
-    base_url="https://api.deepseek.com/v1"
+    base_url=os.getenv("LLM_BASE_URL", "https://api.deepseek.com/v1")
 )
 
 
@@ -111,6 +112,23 @@ def normalize_result_item(result, indicator_name, chunks):
         indicator_name
     )
     return result
+
+
+def error_summary(exc):
+    """把 OpenAI 异常中的字典原文转换为可读的简短说明。"""
+    text = str(exc)
+    try:
+        start = text.find("{")
+        if start != -1:
+            data = ast.literal_eval(text[start:])
+            error = data.get("error", data) if isinstance(data, dict) else {}
+            if isinstance(error, dict):
+                message = error.get("message") or data.get("message") or text
+                code = error.get("code") or data.get("code") or ""
+                return f"HTTP {code}: {message}" if code else str(message)
+    except Exception:
+        pass
+    return text
 
 
 def build_candidate_text(chunks):
@@ -298,7 +316,7 @@ for index, (indicator_name, chunks) in enumerate(indicator_groups.items(), start
             }
         )
 
-        print("提取失败:", str(e))
+        print("提取失败:", error_summary(e))
         print("继续处理下一个指标")
 
 
