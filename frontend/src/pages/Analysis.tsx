@@ -110,16 +110,13 @@ export function Analysis({
           companies={companies}
           years={years}
           quarters={quarters}
-          indicators={indicators}
           company={company}
           year={year}
           quarter={quarter}
-          indicator={indicator}
           mode="period"
           onCompanyChange={setCompany}
           onYearChange={setYear}
           onQuarterChange={setQuarter}
-          onIndicatorChange={setIndicator}
         />
         <button className="primary-action" onClick={runAnalysis}>
           开始分析
@@ -220,13 +217,35 @@ export function Analysis({
         <section className="panel">
           <h2>图4：趋势分析</h2>
           {trendChart && (
-            <LineChart title={trendChart.title} x={trendChart.x} y={trendChart.y} unit={trendChart.unit} />
+            <LineChart
+              title={trendChart.title}
+              x={trendChart.x}
+              y={trendChart.y}
+              unit={trendChart.unit}
+              series={trendChart.series}
+            />
           )}
         </section>
       </div>
 
       <section className="panel">
-        <h2>排名与统计</h2>
+        <div className="task-title">
+          <h2>排名与统计</h2>
+          <label className="rank-indicator">
+            指标
+            <select
+              value={indicator}
+              onChange={(event) => setIndicator(event.target.value)}
+            >
+              {indicators.map((item) => (
+                <option key={`${item.indicator_id}-${item.indicator_name}`} value={item.indicator_name}>
+                  {item.indicator_name}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <p className="progress-caption">本区域与“图4：趋势分析”会随所选指标变化。</p>
         <div className="rank-list">
           {(comparison?.ranking ?? []).map((item) => (
             <div key={item.company}>

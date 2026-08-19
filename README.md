@@ -192,6 +192,10 @@ POST /api/settings/llm/test
 - **LLM API Key**：本机默认 Key 对 DeepSeek 官方接口无效，但对
   `https://api.nwafu-ai.cn/v1` 有效，因此指标提取默认使用该接口；更换 Key 后请在
   “模型设置”页重新保存并“测试连接”。
+- **API Key 安全与机器绑定**：`data/llm_settings.json` 已加入 `.gitignore` 和
+  `.dockerignore`，不会进入版本库或 Docker 镜像。Key 在保存时绑定本机硬件标识；
+  项目分发给其他电脑后，即使文件被一起复制，对方机器也会自动清除该 Key 并提示
+  重新配置，无法直接使用原 Key。旧版本未绑定的 Key 在重启后同样需要重新保存一次。
 - **自动报告饼图**：曾出现环形图不圆/内孔变形问题，已改为 SVG 描边圆环绘制
   （stroke-dasharray），外圆与内孔均为正圆；修改后需重启后端并重新生成报告。
 - **同一年多报告期**：自动报告目前按“公司 + 年份”生成，若数据库同年存在多个报告期

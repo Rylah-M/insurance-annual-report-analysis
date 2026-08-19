@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
 import pandas as pd
@@ -97,7 +98,30 @@ def year_over_year(df: pd.DataFrame, company: str, indicator_name: str) -> list[
     if metric_df.empty:
         return []
 
-    metric_df = metric_df.sort_values("year")
+    def period_order(report_period: Any, year: int) -> int:
+        rp = str(report_period or "").strip()
+        if not rp or rp == str(year):
+            return 5
+        match = re.search(r"(Q[1-4]|H[1-2])$", rp.upper())
+        if not match:
+            return 9
+        token = match.group(1)
+        if token == "Q1":
+            return 1
+        if token in ("Q2", "H1"):
+            return 2
+        if token == "Q3":
+            return 3
+        return 4
+
+    metric_df = metric_df.copy()
+    metric_df["_period_order"] = [
+        period_order(report_period, year)
+        for report_period, year in zip(metric_df["report_period"], metric_df["year"])
+    ]
+    metric_df = metric_df.sort_values(["year", "_period_order"]).drop(
+        columns=["_period_order"]
+    )
     metric_df["previous_value"] = metric_df["indicator_value"].shift(1)
     metric_df["change"] = metric_df["indicator_value"] - metric_df["previous_value"]
     metric_df["change_rate"] = metric_df["change"] / metric_df["previous_value"] * 100
@@ -107,6 +131,15 @@ def year_over_year(df: pd.DataFrame, company: str, indicator_name: str) -> list[
         rows.append(
             {
                 "year": int(row.year),
+                "report_period": row.report_period
+                if isinstance(row.report_period, str)
+                else None,
+                "label": (
+                    row.report_period
+                    if isinstance(row.report_period, str)
+                    and str(row.report_period) != str(int(row.year))
+                    else str(int(row.year))
+                ),
                 "value": float(row.indicator_value),
                 "unit": row.unit,
                 "previous_value": None

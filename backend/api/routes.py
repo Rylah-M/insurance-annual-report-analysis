@@ -29,6 +29,7 @@ from services.mineru_manager import restart_mineru, stop_mineru
 from services.llm_settings import (
     DEFAULT_BASE_URL,
     effective_llm_env,
+    is_current_owner,
     load_settings,
     mask_key,
     save_settings,
@@ -358,7 +359,8 @@ def api_chart_trend(
         "indicator": indicator,
         "x": trend["chart"]["xAxis"],
         "y": trend["chart"]["series"][0]["data"],
-        "unit": trend["chart"]["series"][0]["unit"],
+        "series": trend["chart"]["series"],
+        "unit": (trend["chart"]["series"][0] or {}).get("unit"),
         "values": trend["values"],
     }
 
@@ -564,8 +566,13 @@ def report_status(task_id: str) -> dict[str, Any]:
 @router.get("/settings/llm")
 def get_llm_settings() -> dict[str, Any]:
     settings = load_settings()
+    configured = bool(settings.get("api_key")) and is_current_owner(settings)
+    needs_reconfigure = bool(settings.get("foreign_key_detected")) or (
+        bool(settings.get("api_key")) and not is_current_owner(settings)
+    )
     return {
-        "configured": bool(settings.get("api_key")),
+        "configured": configured,
+        "needs_reconfigure": needs_reconfigure,
         "base_url": settings.get("base_url", DEFAULT_BASE_URL),
         "api_key_masked": mask_key(settings.get("api_key", "")),
         "updated_at": settings.get("updated_at", ""),
@@ -585,6 +592,7 @@ def set_llm_settings(
     settings = save_settings(api_key, base_url or DEFAULT_BASE_URL)
     return {
         "configured": True,
+        "needs_reconfigure": False,
         "base_url": settings["base_url"],
         "api_key_masked": mask_key(settings["api_key"]),
         "updated_at": settings["updated_at"],

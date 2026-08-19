@@ -98,6 +98,11 @@ export type ChartPayload = {
   company?: string;
   x: Array<string | number>;
   y: Array<number | null>;
+  series?: Array<{
+    name: string;
+    data: Array<number | null>;
+    unit?: string | null;
+  }>;
   unit: string | null;
   values?: Array<Record<string, unknown>>;
 };
@@ -331,6 +336,7 @@ export type ExtractionResult = {
 
 export type LlmSettings = {
   configured: boolean;
+  needs_reconfigure?: boolean;
   base_url: string;
   api_key_masked: string;
   updated_at: string;

@@ -12,6 +12,7 @@ frontend/dist
 frontend/.env
 .pnpm-store
 data/*.db
+data/llm_settings.json
 agents/**/data/uploads
 agents/**/data/mineru_api_output
 agents/**/parse_v1/output

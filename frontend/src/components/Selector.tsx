@@ -18,16 +18,16 @@ export function AnalysisSelector({
   companies: string[];
   years: number[];
   quarters?: string[];
-  indicators: Indicator[];
+  indicators?: Indicator[];
   company: string;
   year?: number;
   quarter?: string;
-  indicator: string;
+  indicator?: string;
   mode?: "indicator" | "period";
   onCompanyChange: (value: string) => void;
   onYearChange: (value: number) => void;
   onQuarterChange?: (value: string) => void;
-  onIndicatorChange: (value: string) => void;
+  onIndicatorChange?: (value: string) => void;
 }) {
   return (
     <div className="toolbar">
@@ -61,16 +61,18 @@ export function AnalysisSelector({
           </select>
         </label>
       )}
-      <label>
-        指标
-        <select value={indicator} onChange={(event) => onIndicatorChange(event.target.value)}>
-          {indicators.map((item) => (
-            <option key={`${item.indicator_id}-${item.indicator_name}`} value={item.indicator_name}>
-              {item.indicator_name}
-            </option>
-          ))}
-        </select>
-      </label>
+      {indicator !== undefined && onIndicatorChange && (
+        <label>
+          指标
+          <select value={indicator} onChange={(event) => onIndicatorChange(event.target.value)}>
+            {(indicators ?? []).map((item) => (
+              <option key={`${item.indicator_id}-${item.indicator_name}`} value={item.indicator_name}>
+                {item.indicator_name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
     </div>
   );
 }

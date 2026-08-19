@@ -279,9 +279,9 @@ select {
 
 .rank-list div {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) auto;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
   align-items: baseline;
-  gap: 12px;
+  gap: 10px;
 }
 
 .feature-list div {
@@ -362,6 +362,9 @@ select {
 
 .rank-list b {
   text-align: right;
+  white-space: nowrap;
+  font-size: 13px;
+  color: #172033;
 }
 
 .report-row {
@@ -595,21 +598,6 @@ select {
   line-height: 1.65;
 }
 
-.chat-bubble p.chat-line {
-  margin: 0.25em 0;
-}
-
-.chat-bubble ul,
-.chat-bubble ol {
-  margin: 0.25em 0;
-  padding-left: 1.3em;
-}
-
-.chat-bubble li {
-  margin: 0.15em 0;
-  line-height: 1.6;
-}
-
 .chat-bubble .spin {
   vertical-align: middle;
 }
@@ -806,6 +794,18 @@ select {
   font-weight: 600;
   vertical-align: 2px;
   cursor: help;
+}
+
+.rank-indicator {
+  display: grid;
+  gap: 4px;
+  margin-left: auto;
+  color: #475467;
+  font-size: 13px;
+}
+
+.rank-indicator select {
+  min-width: 220px;
 }
 
 .task-badge {

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
 import pandas as pd
@@ -14,6 +15,35 @@ INDICATOR_CATEGORIES = {
     "偿付能力": {"核心偿付能力充足率", "综合偿付能力充足率"},
     "资产负债": {"总资产", "投资资产", "保险合同负债", "未决赔款准备金"},
 }
+
+FLOW_INDICATOR_KEYWORDS = (
+    "原保险保费收入",
+    "保险服务收入",
+    "保险服务费用",
+    "车险保费收入",
+    "非车险保费收入",
+    "农业保险保费",
+    "健康险保费",
+    "车险保险服务收入",
+    "非车保险服务收入",
+    "承保利润",
+    "净利润",
+    "投资收益",
+)
+
+
+def _is_flow_indicator(indicator_name: str) -> bool:
+    return any(keyword in indicator_name for keyword in FLOW_INDICATOR_KEYWORDS)
+
+
+def _period_token(row: dict[str, Any]) -> str:
+    report_period = str(row.get("report_period") or "")
+    match = re.search(r"(Q[1-4]|H[1-2]|FY)$", report_period.upper())
+    if match:
+        return match.group(1)
+    if not report_period or report_period == str(row.get("year")):
+        return "全年"
+    return report_period
 
 
 def compare_indicator(
@@ -127,18 +157,52 @@ def report_snapshot(df: pd.DataFrame, company: str, year: int) -> dict[str, Any]
 
 def trend_data(df: pd.DataFrame, company: str, indicator_name: str) -> dict[str, Any]:
     rows = year_over_year(df, company, indicator_name)
+    if not rows:
+        return {
+            "company": company,
+            "indicator": indicator_name,
+            "values": [],
+            "chart": {"type": "line", "xAxis": [], "series": []},
+        }
+    unit = rows[0].get("unit")
+    if _is_flow_indicator(indicator_name):
+        # 流量类指标（如保费收入）半年报与年报不可直接比较，
+        # 只使用每年 Q4（年报）口径；没有 Q4 时回退到全年口径。
+        flow_rows = [row for row in rows if _period_token(row) == "Q4"]
+        if not flow_rows:
+            flow_rows = [
+                row for row in rows if _period_token(row) in ("全年", "FY", "H2")
+            ]
+        if not flow_rows:
+            flow_rows = rows
+        return {
+            "company": company,
+            "indicator": indicator_name,
+            "values": flow_rows,
+            "chart": {
+                "type": "line",
+                "xAxis": [row.get("label", str(row["year"])) for row in flow_rows],
+                "series": [
+                    {
+                        "name": indicator_name,
+                        "data": [row["value"] for row in flow_rows],
+                        "unit": unit,
+                    }
+                ],
+            },
+        }
     return {
         "company": company,
         "indicator": indicator_name,
         "values": rows,
         "chart": {
             "type": "line",
-            "xAxis": [item["year"] for item in rows],
+            "xAxis": [item.get("label", item["year"]) for item in rows],
             "series": [
                 {
                     "name": indicator_name,
                     "data": [item["value"] for item in rows],
-                    "unit": rows[0]["unit"] if rows else None,
+                    "unit": unit,
                 }
             ],
         },

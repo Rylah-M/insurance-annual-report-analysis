@@ -102,29 +102,33 @@ function App() {
             <span>{error}</span>
           </div>
         )}
-        {page === "overview" && <Dashboard metadata={metadata} onNavigate={(target) => setPage(target as PageKey)} />}
-        {page === "upload" && (
+        <div style={page === "overview" ? undefined : { display: "none" }}>
+          <Dashboard metadata={metadata} onNavigate={(target) => setPage(target as PageKey)} />
+        </div>
+        <div style={page === "upload" ? undefined : { display: "none" }}>
           <UploadReport
             onExtractionStarted={(taskId) => {
               setActiveTaskId(taskId);
               setPage("extraction");
             }}
           />
-        )}
-        {page === "analysis" && (
+        </div>
+        <div style={page === "analysis" ? undefined : { display: "none" }}>
           <Analysis companies={companies} years={years} quarters={quarters} indicators={indicators} />
-        )}
-        {page === "report" && (
+        </div>
+        <div style={page === "report" ? undefined : { display: "none" }}>
           <Report companies={companies} years={years} indicators={indicators} />
-        )}
-        {page === "autoReport" && (
+        </div>
+        <div style={page === "autoReport" ? undefined : { display: "none" }}>
           <AutoReport companies={companies} years={years} />
-        )}
+        </div>
         <Chat active={page === "chat"} />
-        {page === "extraction" && (
+        <div style={page === "extraction" ? undefined : { display: "none" }}>
           <Extraction key={activeTaskId || "none"} taskId={activeTaskId || "none"} />
-        )}
-        {page === "settings" && <Settings />}
+        </div>
+        <div style={page === "settings" ? undefined : { display: "none" }}>
+          <Settings />
+        </div>
       </main>
     </div>
   );

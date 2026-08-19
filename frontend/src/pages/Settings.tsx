@@ -79,17 +79,34 @@ export function Settings() {
         <h1>配置指标提取使用的 API Key</h1>
       </header>
 
+      {current?.needs_reconfigure && (
+        <div className="error-banner">
+          <XCircle size={18} />
+          <span>
+            检测到当前保存的 API Key 来自其他电脑，不能直接使用；请重新输入你自己的 API Key 并点击“保存并生效”。
+          </span>
+        </div>
+      )}
+
       <section className="panel">
         <div className="settings-status">
           <KeyRound size={22} />
           <div>
-            <strong>{current?.configured ? "已配置 API Key" : "尚未配置 API Key"}</strong>
+            <strong>
+              {current?.needs_reconfigure
+                ? "需要重新配置 API Key"
+                : current?.configured
+                  ? "已配置 API Key"
+                  : "尚未配置 API Key"}
+            </strong>
             <span>
-              {current?.configured
+              {current?.needs_reconfigure
+                ? "当前保存的 Key 来自其他电脑，不能直接使用"
+                : current?.configured
                 ? `Key：${current.api_key_masked}`
                 : "保存后，指标提取任务将自动使用该 Key"}
             </span>
-            {current?.configured && (
+            {current?.configured && !current.needs_reconfigure && (
               <span className="settings-url">接口地址：{current.base_url}</span>
             )}
           </div>
@@ -103,7 +120,13 @@ export function Settings() {
               type="password"
               value={apiKey}
               onChange={(event) => setApiKey(event.target.value)}
-              placeholder={current?.configured ? "留空表示继续使用已保存的 Key" : "请输入 API Key"}
+              placeholder={
+                current?.needs_reconfigure
+                  ? "请输入你自己的 API Key"
+                  : current?.configured
+                    ? "留空表示继续使用已保存的 Key"
+                    : "请输入 API Key"
+              }
               autoComplete="off"
             />
           </label>
