@@ -94,7 +94,7 @@ export function Dashboard({
       </header>
 
       <div className="quick-actions">
-        <button className="primary-action" onClick={() => onNavigate("upload")}>
+        <button className="primary-action" onClick={() => onNavigate("extraction")}>
           上传年报
         </button>
         <button className="primary-action" onClick={() => onNavigate("autoReport")}>

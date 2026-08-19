@@ -9,8 +9,7 @@ import {
   Home,
   KeyRound,
   MessageCircle,
-  ScrollText,
-  UploadCloud
+  ScrollText
 } from "lucide-react";
 import "antd/dist/reset.css";
 import "./styles.css";
@@ -19,14 +18,12 @@ import { Analysis } from "./pages/Analysis";
 import { AutoReport } from "./pages/AutoReport";
 import { Chat } from "./pages/Chat";
 import { Dashboard } from "./pages/Dashboard";
-import { Extraction } from "./pages/Extraction";
 import { Report } from "./pages/Report";
 import { Settings } from "./pages/Settings";
 import { UploadReport } from "./pages/UploadReport";
 
 type PageKey =
   | "overview"
-  | "upload"
   | "analysis"
   | "report"
   | "autoReport"
@@ -36,7 +33,6 @@ type PageKey =
 
 const navItems = [
   { key: "overview" as const, label: "项目总览", icon: Home },
-  { key: "upload" as const, label: "上传年报", icon: UploadCloud },
   { key: "extraction" as const, label: "指标提取", icon: FileSearch },
   { key: "analysis" as const, label: "数据分析", icon: BarChart3 },
   { key: "report" as const, label: "业务分析", icon: ScrollText },
@@ -47,7 +43,6 @@ const navItems = [
 
 function App() {
   const [page, setPage] = useState<PageKey>("overview");
-  const [activeTaskId, setActiveTaskId] = useState("");
   const [metadata, setMetadata] = useState<Metadata | null>(null);
   const [companies, setCompanies] = useState<string[]>([]);
   const [years, setYears] = useState<number[]>([]);
@@ -105,14 +100,6 @@ function App() {
         <div style={page === "overview" ? undefined : { display: "none" }}>
           <Dashboard metadata={metadata} onNavigate={(target) => setPage(target as PageKey)} />
         </div>
-        <div style={page === "upload" ? undefined : { display: "none" }}>
-          <UploadReport
-            onExtractionStarted={(taskId) => {
-              setActiveTaskId(taskId);
-              setPage("extraction");
-            }}
-          />
-        </div>
         <div style={page === "analysis" ? undefined : { display: "none" }}>
           <Analysis companies={companies} years={years} quarters={quarters} indicators={indicators} />
         </div>
@@ -124,7 +111,7 @@ function App() {
         </div>
         <Chat active={page === "chat"} />
         <div style={page === "extraction" ? undefined : { display: "none" }}>
-          <Extraction key={activeTaskId || "none"} taskId={activeTaskId || "none"} />
+          <UploadReport />
         </div>
         <div style={page === "settings" ? undefined : { display: "none" }}>
           <Settings />

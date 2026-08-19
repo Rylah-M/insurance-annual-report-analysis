@@ -1,29 +1,20 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  CheckCircle2,
-  CircleDashed,
+  ArrowRight,
+  Database,
   FileUp,
   Loader2,
   Play,
   Square,
   XCircle
 } from "lucide-react";
-import { api, ReportTask, ReportTaskStatus, UploadReportResponse } from "../api/request";
-
-const PARSE_STAGES = [
-  { key: "PDF 上传完成", progress: 10, label: "PDF 上传完成" },
-  { key: "MinerU 解析", progress: 40, label: "MinerU 解析" },
-  { key: "Markdown 生成", progress: 70, label: "Markdown 生成" },
-  { key: "Chunk 切片完成", progress: 100, label: "Chunk 切片完成" }
-];
-
-const EXTRACT_STAGES = [
-  "指标召回",
-  "候选增强",
-  "候选排序",
-  "LLM 指标提取",
-  "数据生成"
-];
+import {
+  api,
+  ExtractionResult,
+  ReportTask,
+  ReportTaskStatus,
+  UploadReportResponse
+} from "../api/request";
 
 function cleanLogLine(line: string) {
   const match = line.match(
@@ -36,11 +27,7 @@ function cleanLogLine(line: string) {
   return line;
 }
 
-export function UploadReport({
-  onExtractionStarted
-}: {
-  onExtractionStarted: (taskId: string) => void;
-}) {
+export function UploadReport() {
   const [file, setFile] = useState<File | null>(null);
   const [company, setCompany] = useState("");
   const [year, setYear] = useState("2024");
@@ -53,9 +40,10 @@ export function UploadReport({
   const [tasks, setTasks] = useState<ReportTask[]>([]);
   const [taskId, setTaskId] = useState("");
   const [status, setStatus] = useState<ReportTaskStatus | null>(null);
+  const [result, setResult] = useState<ExtractionResult | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [extracting, setExtracting] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [importing, setImporting] = useState(false);
   const [error, setError] = useState("");
   const timerRef = useRef<number | null>(null);
 
@@ -83,6 +71,17 @@ export function UploadReport({
 
   const defaultOutputName = [company.trim(), year, quarter, market].filter(Boolean).join("_");
   const effectiveOutputName = outputName.trim() || defaultOutputName;
+  const done =
+    status?.status === "success" && (status?.result_rows ?? 0) > 0;
+  const imported =
+    status?.database_imported === true || Boolean(status?.database_path);
+  const activeTask =
+    status?.status === "processing" ||
+    status?.status === "extracting" ||
+    status?.status === "uploaded";
+  const runningTaskCount = tasks.filter((task) =>
+    ["processing", "extracting", "uploaded"].includes(task.status)
+  ).length;
 
   const pollStatus = (id: string) => {
     stopPolling();
@@ -90,7 +89,15 @@ export function UploadReport({
       try {
         const next = await api.reportStatus(id);
         setStatus(next);
-        if (["failed", "success", "cancelled"].includes(next.status)) stopPolling();
+        if (
+          ["failed", "cancelled"].includes(next.status) ||
+          (next.status === "success" && (next.result_rows ?? 0) > 0)
+        ) {
+          stopPolling();
+          if (next.status === "success") {
+            api.extractionResult(id).then(setResult).catch(() => undefined);
+          }
+        }
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
         stopPolling();
@@ -109,6 +116,7 @@ export function UploadReport({
     }
     setUploading(true);
     setError("");
+    setResult(null);
     try {
       const form = new FormData();
       form.append("file", file);
@@ -139,20 +147,6 @@ export function UploadReport({
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setUploading(false);
-    }
-  };
-
-  const handleExtract = async () => {
-    if (!taskId) return;
-    setExtracting(true);
-    setError("");
-    try {
-      await api.startExtraction(taskId);
-      onExtractionStarted(taskId);
-      pollStatus(taskId);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-      setExtracting(false);
     }
   };
 
@@ -188,9 +182,29 @@ export function UploadReport({
     }
   };
 
+  const handleImport = async () => {
+    if (!taskId) return;
+    setImporting(true);
+    setError("");
+    try {
+      await api.importExtraction(taskId);
+      setStatus((current) =>
+        current
+          ? { ...current, database_imported: true, database_path: "已写入" }
+          : current
+      );
+      refreshTasks();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setImporting(false);
+    }
+  };
+
   const watchTask = (id: string) => {
     setTaskId(id);
     setStatus(null);
+    setResult(null);
     setError("");
     pollStatus(id);
   };
@@ -198,18 +212,14 @@ export function UploadReport({
   const progress = status?.progress ?? 0;
   const failed = status?.status === "failed";
   const cancelled = status?.status === "cancelled";
-  const parseDone = status?.status === "success" || status?.status === "extracting";
   const currentStage = status?.stage ?? "";
-  const activeTask = status?.status === "processing" || status?.status === "extracting" || status?.status === "uploaded";
-  const runningTaskCount = tasks.filter((task) =>
-    ["processing", "extracting", "uploaded"].includes(task.status)
-  ).length;
+  const rows = result?.rows ?? [];
 
   return (
     <section className="page">
       <header>
-        <p>上传年报</p>
-        <h1>上传 PDF 并自动解析生成 chunks</h1>
+        <p>指标提取</p>
+        <h1>上传年报并自动完成解析与指标提取</h1>
       </header>
 
       <section className="panel">
@@ -299,7 +309,7 @@ export function UploadReport({
             </label>
           </div>
           <p className="form-hint">
-            默认命名：{defaultOutputName || "公司_年份_报告期_市场"}；切换左侧栏目不会中断正在进行的解析任务。
+            默认命名：{defaultOutputName || "公司_年份_报告期_市场"}；上传后自动完成解析与指标提取，切换页面不会中断。
           </p>
 
           <button
@@ -308,18 +318,18 @@ export function UploadReport({
             disabled={uploading || (status?.status === "processing" && !failed)}
           >
             {uploading ? <Loader2 className="spin" size={18} /> : <Play size={18} />}
-            开始解析
+            上传并提取
           </button>
         </div>
       </section>
 
       {error && <div className="error-banner">{error}</div>}
 
-      {taskId && (
+      {taskId && !done && (
         <section className="panel">
           <div className="task-title">
             <h2>
-              解析任务
+              指标提取任务
               <span className="task-id-short" title={`完整任务编号：${taskId}`}>
                 #{taskId.slice(0, 8)}
               </span>
@@ -344,55 +354,6 @@ export function UploadReport({
                 : `${progress}% · ${currentStage || "等待开始"}`}
           </p>
 
-          <div className="stage-grid">
-            {PARSE_STAGES.map((stage) => {
-              const done = progress >= stage.progress;
-              const active = currentStage === stage.label && !done && !failed;
-              return (
-                <div className={`stage-item ${done ? "done" : ""} ${active ? "active" : ""}`} key={stage.key}>
-                  {done ? <CheckCircle2 size={18} /> : active ? <Loader2 className="spin" size={18} /> : <CircleDashed size={18} />}
-                  <span>{stage.label}</span>
-                  <small>{done ? "完成" : active ? "处理中" : "等待"}</small>
-                </div>
-              );
-            })}
-          </div>
-
-          {parseDone && (
-            <div className="extract-action-row">
-              <button
-                className="primary-action"
-                onClick={handleExtract}
-                disabled={extracting || status?.status === "extracting"}
-              >
-                {extracting || status?.status === "extracting" ? (
-                  <Loader2 className="spin" size={18} />
-                ) : (
-                  <Play size={18} />
-                )}
-                {status?.status === "extracting" ? "指标提取中..." : "启动指标提取"}
-              </button>
-            </div>
-          )}
-
-          {["指标召回", "候选增强", "候选排序", "LLM 指标提取", "数据生成"].some(
-            (stage) => currentStage === stage
-          ) && (
-            <div className="extract-stages">
-              {EXTRACT_STAGES.map((stage, index) => {
-                const stageIndex = EXTRACT_STAGES.indexOf(currentStage);
-                const done = stageIndex > index;
-                const active = stageIndex === index;
-                return (
-                  <span className={`extract-step ${done ? "done" : ""} ${active ? "active" : ""}`} key={stage}>
-                    {done ? <CheckCircle2 size={16} /> : active ? <Loader2 className="spin" size={16} /> : <CircleDashed size={16} />}
-                    {index + 1}. {stage}
-                  </span>
-                );
-              })}
-            </div>
-          )}
-
           {failed && <XCircle className="failed-icon" size={20} />}
 
           {status && status.logs.length > 0 && (
@@ -406,9 +367,76 @@ export function UploadReport({
         </section>
       )}
 
+      {done && (
+        <section className="panel">
+          <div className="task-title">
+            <h2>提取结果</h2>
+            <span className="muted">{rows.length} 条记录</span>
+            <button
+              className="primary-action"
+              onClick={handleImport}
+              disabled={importing || imported}
+            >
+              {importing ? <Loader2 className="spin" size={18} /> : <Database size={18} />}
+              {imported ? "已写入数据库" : "写入数据库"}
+            </button>
+          </div>
+
+          {rows.length > 0 ? (
+            <div className="compare-table-wrap">
+              <table className="compare-table">
+                <thead>
+                  <tr>
+                    <th>指标</th>
+                    <th>数值</th>
+                    <th>单位</th>
+                    <th>置信度</th>
+                    <th>业务范围</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rows.map((row, index) => (
+                    <tr key={`${row.indicator_id}-${index}`}>
+                      <td>
+                        <strong>{row.indicator_name}</strong>
+                        <small className="table-sub">{row.indicator_id}</small>
+                      </td>
+                      <td>{row.indicator_value || "-"}</td>
+                      <td>{row.unit || "-"}</td>
+                      <td>{row.confidence_score !== "" ? row.confidence_score : "-"}</td>
+                      <td>{row.business_scope || "-"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="placeholder">本次未提取到指标结果。</p>
+          )}
+
+          {rows.length > 0 && (
+            <details className="log-details">
+              <summary>查看来源原文</summary>
+              <div className="source-list">
+                {rows.map((row, index) => (
+                  <div className="source-item" key={index}>
+                    <strong>
+                      {row.indicator_name}
+                      <ArrowRight size={14} />
+                      {row.indicator_value} {row.unit}
+                    </strong>
+                    <p>{row.source_text || "无来源文本"}</p>
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+        </section>
+      )}
+
       <section className="panel">
         <div className="task-title">
-          <h2>最近解析任务</h2>
+          <h2>最近任务</h2>
           <span className="muted">{runningTaskCount > 0 ? `${runningTaskCount} 个任务进行中` : "无进行中任务"}</span>
         </div>
         {tasks.length === 0 ? (

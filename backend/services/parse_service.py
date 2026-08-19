@@ -29,6 +29,7 @@ def run_parse(
     end_page: int | None = None,
     page_mode: str = "label",
     output_name: str | None = None,
+    auto_extract: bool = True,
 ) -> dict:
     """Run the existing parse_v1 pipeline without modifying its logic."""
     os.environ["NO_PROXY"] = "127.0.0.1,localhost"
@@ -105,6 +106,11 @@ def run_parse(
         chunks_path=str(result.chunks_path),
         result_file=str(result.chunks_path),
     )
+    if auto_extract:
+        append_log(task_id, "解析完成，自动启动指标提取")
+        from .indicator_service import start_extraction_background
+
+        start_extraction_background(task_id)
     return {
         "task_id": task_id,
         "status": "success",
@@ -126,6 +132,7 @@ def start_parse_background(
     end_page: int | None = None,
     page_mode: str = "label",
     output_name: str | None = None,
+    auto_extract: bool = True,
 ) -> None:
     thread = threading.Thread(
         target=run_parse,
@@ -135,6 +142,7 @@ def start_parse_background(
             "end_page": end_page,
             "page_mode": page_mode,
             "output_name": output_name,
+            "auto_extract": auto_extract,
         },
         daemon=True,
         name=f"parse-{task_id}",
