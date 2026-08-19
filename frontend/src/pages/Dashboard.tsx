@@ -5,10 +5,12 @@ import { DataCard } from "../components/Card";
 
 export function Dashboard({
   metadata,
-  onNavigate
+  onNavigate,
+  active = true
 }: {
   metadata: Metadata | null;
   onNavigate: (page: string) => void;
+  active?: boolean;
 }) {
   const [records, setRecords] = useState<Array<Record<string, unknown>>>([]);
   const [companyFilter, setCompanyFilter] = useState("");
@@ -18,11 +20,13 @@ export function Dashboard({
   const [fileName, setFileName] = useState("database_overview.csv");
 
   useEffect(() => {
-    api
-      .records()
-      .then(setRecords)
-      .catch(() => setRecords([]));
-  }, []);
+    if (active) {
+      api
+        .records()
+        .then(setRecords)
+        .catch(() => setRecords([]));
+    }
+  }, [active]);
 
   const dataQuality = metadata
     ? `${Math.round((metadata.available_values / Math.max(metadata.rows, 1)) * 1000) / 10}%`

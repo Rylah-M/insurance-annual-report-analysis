@@ -101,6 +101,11 @@ def import_database_for_task(task_id: str) -> dict[str, Any]:
     task = get_task(task_id) or {}
     if task.get("status") != "success" or not task.get("result_rows"):
         raise RuntimeError("任务尚未完成提取，无法写入数据库")
+    tag = task.get("output_name") or ""
+    if tag:
+        # 先按当前（可能已人工编辑）的提取结果重新生成数据库 CSV，
+        # 再同步到项目数据库，确保编辑内容真正生效。
+        run_script(task_id, "generate_indicator_database.py", tag)
     db_path = update_database_from_csv()
     update_task(
         task_id,

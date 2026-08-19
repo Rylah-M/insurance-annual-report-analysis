@@ -62,6 +62,15 @@ function App() {
       .catch((err) => setError(err.message));
   }, []);
 
+  useEffect(() => {
+    if (page === "overview") {
+      api
+        .metadata()
+        .then(setMetadata)
+        .catch(() => undefined);
+    }
+  }, [page]);
+
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -98,7 +107,11 @@ function App() {
           </div>
         )}
         <div style={page === "overview" ? undefined : { display: "none" }}>
-          <Dashboard metadata={metadata} onNavigate={(target) => setPage(target as PageKey)} />
+          <Dashboard
+            metadata={metadata}
+            onNavigate={(target) => setPage(target as PageKey)}
+            active={page === "overview"}
+          />
         </div>
         <div style={page === "analysis" ? undefined : { display: "none" }}>
           <Analysis companies={companies} years={years} quarters={quarters} indicators={indicators} />
