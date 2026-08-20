@@ -437,8 +437,12 @@ def download_report(
     df = load_database()
     if company not in set(df["company"].dropna()):
         raise HTTPException(status_code=404, detail="公司不存在")
-    data = build_report_data(df, company, int(year))
-    files = generate_report_files(df, company, int(year))
+    json_path = REPORT_DIR / f"{company}_{year}.json"
+    if json_path.exists():
+        data = json.loads(json_path.read_text(encoding="utf-8"))
+    else:
+        data = build_report_data(df, company, int(year))
+    files = generate_report_files(df, company, int(year), data=data)
     save_report_artifact(
         company,
         int(year),
