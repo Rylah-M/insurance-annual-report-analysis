@@ -456,8 +456,8 @@ export function UploadReport() {
                   {rows.map((row, index) => (
                     <tr key={`${row.indicator_id}-${index}`}>
                       <td>
-                        <strong>{row.indicator_name}</strong>
-                        <small className="table-sub">{row.indicator_id}</small>
+                        <strong>{String(row.indicator_name)}</strong>
+                        <small className="table-sub">{String(row.indicator_id)}</small>
                       </td>
                       <td>
                         <input
@@ -514,11 +514,11 @@ export function UploadReport() {
                 {rows.map((row, index) => (
                   <div className="source-item" key={index}>
                     <strong>
-                      {row.indicator_name}
+                      {String(row.indicator_name)}
                       <ArrowRight size={14} />
-                      {row.indicator_value} {row.unit}
+                      {String(row.indicator_value)} {String(row.unit)}
                     </strong>
-                    <p>{row.source_text || "无来源文本"}</p>
+                    <p>{String(row.source_text || "无来源文本")}</p>
                   </div>
                 ))}
               </div>
