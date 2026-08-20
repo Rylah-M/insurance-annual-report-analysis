@@ -755,6 +755,8 @@ select {
 
 .upload-fields input,
 .upload-fields select {
+  width: 100%;
+  height: 40px;
   min-width: 0;
   max-width: none;
   border: 1px solid #d0d7e2;
@@ -1184,6 +1186,7 @@ select {
 
 .table-input {
   width: 100%;
+  height: 34px;
   min-width: 90px;
   border: 1px solid #d0d7e2;
   border-radius: 6px;
