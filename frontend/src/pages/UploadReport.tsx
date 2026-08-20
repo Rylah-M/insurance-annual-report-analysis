@@ -35,7 +35,7 @@ export function UploadReport() {
   const [market, setMarket] = useState("A股");
   const [startPage, setStartPage] = useState("1");
   const [endPage, setEndPage] = useState("0");
-  const [pageMode, setPageMode] = useState<"label" | "physical">("label");
+  const [pageMode, setPageMode] = useState<"label" | "physical">("physical");
   const [outputName, setOutputName] = useState("");
   const [tasks, setTasks] = useState<ReportTask[]>([]);
   const [taskId, setTaskId] = useState("");
@@ -293,7 +293,7 @@ export function UploadReport() {
               <input
                 value={company}
                 onChange={(event) => setCompany(event.target.value)}
-                placeholder="例如：中国太保"
+                placeholder="例如：人保"
               />
             </label>
             <label>
