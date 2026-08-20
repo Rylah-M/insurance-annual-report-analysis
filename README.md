@@ -45,7 +45,7 @@
 │   ├── package.json
 │   └── vite.config.ts
 ├── agents/
-│   ├── Annual_Report_Analysis/
+│   ├── parse-agent0820/
 │   └── zd-agent0811/
 ├── data/
 │   └── database.csv
@@ -102,7 +102,7 @@
 - “上传年报”页面支持上传 PDF，填写公司、年份、报告期（Q1-Q4）、市场（A股/H股）；
 - 支持选择解析页码范围（起始页、结束页、阅读器页码/物理页码模式）；
 - 支持自定义 chunks 输出命名，默认自动生成 `<公司>_<年份>_<报告期>_<市场>`；
-- 后台封装 `agents/Annual_Report_Analysis/parse_v1`，不改动原解析逻辑，直接调用
+- 后台封装 `agents/parse-agent0820`，不改动原解析逻辑，直接调用
   MinerU API 完成 PDF → Markdown → chunks；
 - 页面实时显示任务进度：PDF 上传完成 10% → MinerU 解析 40% → Markdown 生成 70%
   → Chunk 切片完成 100%。

@@ -23,7 +23,7 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 INPUT_GLOBS = (
-    "agents/Annual_Report_Analysis/parse_v1/output/*/*_chunks.json",
+    "agents/parse-agent0820/output/*/*_chunks.json",
 )
 OUTPUT_ROOT = PROJECT_ROOT / "output_chunks_v2"
 

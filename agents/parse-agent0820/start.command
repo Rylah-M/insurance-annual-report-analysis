@@ -9,6 +9,28 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
+# 自动定位项目目录（兼容桌面快捷方式等任意位置的启动器副本）
+if [ ! -f "$SCRIPT_DIR/start_mineru_api.sh" ]; then
+    for cand in \
+        "$SCRIPT_DIR/parse-agent0820" \
+        "$HOME/Desktop/parse-agent0820" \
+        "$HOME/parse-agent0820" \
+        "$HOME/Documents/parse-agent0820"; do
+        if [ -f "$cand/start_mineru_api.sh" ]; then
+            SCRIPT_DIR="$cand"
+            break
+        fi
+    done
+fi
+
+if [ ! -f "$SCRIPT_DIR/start_mineru_api.sh" ]; then
+    echo "❌ 找不到 parse_v1 项目目录（缺少 start_mineru_api.sh）"
+    echo "   请把本启动器放回项目文件夹内，或双击项目里的 start.command"
+    read -p "按回车键关闭窗口..." _
+    exit 1
+fi
+
 cd "$SCRIPT_DIR"
 mkdir -p data/logs
 
@@ -53,8 +75,20 @@ for _ in $(seq 1 30); do
     sleep 1
 done
 
-echo ""
-echo "✅ 解析服务：http://127.0.0.1:8000"
-echo "✅ Web 界面：http://localhost:8501"
-echo "（日志：data/logs/mineru_api.log、data/logs/streamlit.log）"
-open http://localhost:8501 2>/dev/null || true
+if [ "$API_OK" = "200" ] && [ "$UI_OK" = "200" ]; then
+    echo ""
+    echo "✅ 解析服务：http://127.0.0.1:8000"
+    echo "✅ Web 界面：http://localhost:8501"
+    echo "（日志：data/logs/mineru_api.log、data/logs/streamlit.log）"
+    open http://localhost:8501 2>/dev/null || true
+    sleep 3
+else
+    echo ""
+    echo "❌ 服务启动失败，最近日志："
+    echo "---- mineru_api.log ----"
+    tail -5 "$SCRIPT_DIR/data/logs/mineru_api.log" 2>/dev/null || true
+    echo "---- streamlit.log ----"
+    tail -5 "$SCRIPT_DIR/data/logs/streamlit.log" 2>/dev/null || true
+    read -p "按回车键关闭窗口..." _
+    exit 1
+fi

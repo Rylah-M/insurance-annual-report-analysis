@@ -9,7 +9,7 @@ from .task_store import append_log, append_step, get_task, update_task
 
 
 AGENTS_ROOT = Path(__file__).resolve().parents[2] / "agents"
-PARSE_V1_DIR = AGENTS_ROOT / "Annual_Report_Analysis" / "parse_v1"
+PARSE_V1_DIR = AGENTS_ROOT / "parse-agent0820"
 MINERU_API_BASE_URL = "http://127.0.0.1:8001"
 
 

@@ -359,8 +359,7 @@ def _find_report_chunks(company: str, year: int) -> Path | None:
     output_root = (
         Path(__file__).resolve().parents[2]
         / "agents"
-        / "Annual_Report_Analysis"
-        / "parse_v1"
+        / "parse-agent0820"
         / "output"
     )
     if not output_root.exists():

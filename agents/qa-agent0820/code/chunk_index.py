@@ -29,7 +29,7 @@ CHUNK_SOURCE_GLOBS = (
     "output_chunks_v2/*/*_chunks.json",
     "output_chunks/*/*_chunks.json",
     "agents/zd-agent0811/chunk/*_chunks.json",
-    "agents/Annual_Report_Analysis/parse_v1/output/*/*_chunks.json",
+    "agents/parse-agent0820/output/*/*_chunks.json",
 )
 
 DEFAULT_TOP_K = 5
