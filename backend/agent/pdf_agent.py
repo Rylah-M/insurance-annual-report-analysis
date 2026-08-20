@@ -21,6 +21,8 @@ def build_pdf(data: dict[str, Any], output_path: str | Path) -> str:
     from reportlab.lib.pagesizes import A4, landscape
     from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
     from reportlab.lib.units import mm
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.cidfonts import UnicodeCIDFont
     from reportlab.platypus import (
         Paragraph,
         SimpleDocTemplate,
@@ -31,11 +33,12 @@ def build_pdf(data: dict[str, Any], output_path: str | Path) -> str:
 
     output = Path(output_path)
     output.parent.mkdir(parents=True, exist_ok=True)
+    pdfmetrics.registerFont(UnicodeCIDFont("STSong-Light"))
     styles = getSampleStyleSheet()
     title_style = ParagraphStyle(
         "ChineseTitle",
         parent=styles["Title"],
-        fontName="Helvetica",
+        fontName="STSong-Light",
         fontSize=18,
         leading=24,
         alignment=1,
@@ -43,7 +46,7 @@ def build_pdf(data: dict[str, Any], output_path: str | Path) -> str:
     heading_style = ParagraphStyle(
         "ChineseHeading",
         parent=styles["Heading2"],
-        fontName="Helvetica",
+        fontName="STSong-Light",
         fontSize=13,
         leading=18,
         textColor=colors.HexColor("#1f6feb"),
@@ -53,7 +56,7 @@ def build_pdf(data: dict[str, Any], output_path: str | Path) -> str:
     body_style = ParagraphStyle(
         "ChineseBody",
         parent=styles["BodyText"],
-        fontName="Helvetica",
+        fontName="STSong-Light",
         fontSize=10,
         leading=16,
     )
@@ -96,7 +99,7 @@ def build_pdf(data: dict[str, Any], output_path: str | Path) -> str:
         table.setStyle(
             TableStyle(
                 [
-                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("FONTNAME", (0, 0), (-1, -1), "STSong-Light"),
                     ("FONTSIZE", (0, 0), (-1, -1), 8),
                     ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f1f5f9")),
                     ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#d7dee8")),
