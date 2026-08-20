@@ -48,6 +48,10 @@ export function UploadReport() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [savedMsg, setSavedMsg] = useState("");
+  const [parsedInfo, setParsedInfo] = useState<{
+    checked: boolean;
+    parsed: boolean;
+  } | null>(null);
   const timerRef = useRef<number | null>(null);
 
   const stopPolling = () => {
@@ -71,6 +75,29 @@ export function UploadReport() {
   useEffect(() => {
     refreshTasks();
   }, []);
+
+  // 选完公司/年份/报告期/市场后，检查该年报是否已解析过
+  useEffect(() => {
+    let cancelled = false;
+    const ready = company.trim() && year && quarter && market;
+    if (!ready) {
+      setParsedInfo(null);
+      return;
+    }
+    api
+      .parsedCheck({ company: company.trim(), year, quarter, market })
+      .then((data) => {
+        if (!cancelled) {
+          setParsedInfo({ checked: true, parsed: data.parsed });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setParsedInfo(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [company, year, quarter, market]);
 
   const defaultOutputName = [company.trim(), year, quarter, market].filter(Boolean).join("_");
   const effectiveOutputName = outputName.trim() || defaultOutputName;
@@ -299,7 +326,7 @@ export function UploadReport() {
             <label>
               年份
               <select value={year} onChange={(event) => setYear(event.target.value)}>
-                {["2025", "2024", "2023", "2022", "2021", "2020"].map((value) => (
+                {["2026", "2025", "2024", "2023", "2022", "2021", "2020"].map((value) => (
                   <option key={value} value={value}>
                     {value}
                   </option>
@@ -360,6 +387,17 @@ export function UploadReport() {
               />
             </label>
           </div>
+          {parsedInfo?.checked && (
+            <p
+              className={`form-hint parsed-hint ${
+                parsedInfo.parsed ? "parsed-ok" : "parsed-miss"
+              }`}
+            >
+              {parsedInfo.parsed
+                ? "✅ 该年报已解析过，可直接进行指标提取（无需重复上传解析）。"
+                : "该年报尚未解析过，需要先上传 PDF 完成解析。"}
+            </p>
+          )}
           <p className="form-hint">
             默认命名：{defaultOutputName || "公司_年份_报告期_市场"}；上传后自动完成解析与指标提取，切换页面不会中断。
           </p>

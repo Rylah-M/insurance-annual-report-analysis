@@ -3,10 +3,10 @@ import { Bot, Loader2, Send, User } from "lucide-react";
 import { api, ChatResponse } from "../api/request";
 
 const SUGGESTIONS = [
-  "2025年人保财险的业务结构有什么变化？",
-  "2024年中国太保综合成本率是多少？",
-  "中国太保盈利能力如何？",
-  "中国太保偿付能力充足率是多少？"
+  "保费增长与保险服务收入增长是否匹配？背后可能反映什么？",
+  "公司是否在主动调整业务结构？调整的方向是什么？",
+  "哪些险种正在成为新的增长点，哪些传统业务的占比正在下降？",
+  "业务结构的变化是否带来了盈利能力的改善？"
 ];
 
 function renderInline(text: string): ReactNode[] {
@@ -217,7 +217,7 @@ export function Chat({ active = true }: { active?: boolean }) {
           <textarea
             value={question}
             onChange={(event) => setQuestion(event.target.value)}
-            placeholder="例如：中国太保综合成本率是多少？"
+            placeholder="2025年人保的业务结构有什么特点？"
             rows={2}
             onKeyDown={(event) => {
               if (event.key === "Enter" && !event.shiftKey) {

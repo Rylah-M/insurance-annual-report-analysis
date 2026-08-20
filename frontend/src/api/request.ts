@@ -300,6 +300,12 @@ export type UploadReportResponse = {
   status: string;
 };
 
+export type ParsedCheckResult = {
+  parsed: boolean;
+  chunks_path?: string | null;
+  report_name?: string;
+};
+
 export type ReportTask = {
   task_id: string;
   company: string;
@@ -452,6 +458,20 @@ export const api = {
       }
       return response.json() as Promise<UploadReportResponse>;
     }),
+  parsedCheck: (params: {
+    company: string;
+    year: string | number;
+    quarter: string;
+    market: string;
+  }) => {
+    const search = new URLSearchParams({
+      company: params.company,
+      year: String(params.year),
+      quarter: params.quarter,
+      market: params.market
+    });
+    return request<ParsedCheckResult>(`/api/report/parsed-check?${search.toString()}`);
+  },
   reportStatus: (taskId: string) =>
     request<ReportTaskStatus>(`/api/report/status/${taskId}`),
   reportTasks: () => request<{ tasks: ReportTask[] }>("/api/report/tasks"),

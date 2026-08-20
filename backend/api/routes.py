@@ -273,10 +273,38 @@ def years() -> list[int]:
 
 @router.get("/quarters")
 def quarters() -> list[str]:
-    df = load_database()
-    if "report_period" not in df.columns:
-        return []
-    return sorted(df["report_period"].dropna().unique().tolist())
+    # 报告期下拉只展示季度(Q1-Q4)，年份由独立的年份下拉选择
+    return ["Q1", "Q2", "Q3", "Q4"]
+
+
+@router.get("/report/parsed-check")
+def parsed_check(
+    company: str = Query(...),
+    year: int = Query(...),
+    quarter: str = Query("Q4"),
+    market: str = Query("A股"),
+) -> dict[str, Any]:
+    """检查该参数对应的年报是否已在本地解析过。"""
+    project_root = Path(__file__).resolve().parents[2]
+    report_name = f"{company}_{year}_{quarter}_{market}"
+    search_roots = [
+        project_root / "agents" / "parse-agent0820" / "output",
+        project_root / "output_chunks_v2",
+    ]
+    chunks_path = None
+    for root in search_roots:
+        if not root.exists():
+            continue
+        target = root / report_name
+        candidate = target / f"{report_name}_chunks.json"
+        if candidate.exists():
+            chunks_path = str(candidate)
+            break
+    return {
+        "parsed": chunks_path is not None,
+        "chunks_path": chunks_path,
+        "report_name": report_name,
+    }
 
 
 @router.get("/indicators")

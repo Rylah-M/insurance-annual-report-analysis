@@ -780,6 +780,18 @@ select {
   font-size: 13px;
 }
 
+.parsed-hint {
+  margin-top: 10px;
+}
+
+.parsed-hint.parsed-ok {
+  color: #1a7f37;
+}
+
+.parsed-hint.parsed-miss {
+  color: #b54708;
+}
+
 .task-title {
   display: flex;
   align-items: center;
