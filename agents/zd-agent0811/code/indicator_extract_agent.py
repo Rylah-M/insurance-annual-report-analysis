@@ -149,6 +149,8 @@ def build_candidate_text(chunks):
                 )
             table_text = "\n\n".join(table_parts)
 
+        table_section = ("表格:\n" + table_text) if table_text else ""
+
         candidate_text += f"""
 
 ======== 候选{i+1} ========
@@ -168,7 +170,7 @@ chunk_id:
 文本:
 {chunk.get('content', '')}
 
-{("表格:\n" + table_text) if table_text else ""}
+{table_section}
 
 """
 
