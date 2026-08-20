@@ -143,6 +143,26 @@ def normalize_business_scope(scope):
     return text
 
 
+def normalize_company(company):
+    """统一公司名称为两字简称：人保/太保/太平/平安/阳光/众安。"""
+    if not company:
+        return ""
+    text = str(company).strip()
+    mapping = {
+        "中国人保": "人保",
+        "中国太保": "太保",
+        "中国太平": "太平",
+        "中国平安": "平安",
+        "中国阳光": "阳光",
+        "阳光保险": "阳光",
+        "众安在线": "众安",
+    }
+    for full, short in mapping.items():
+        if full in text:
+            return short
+    return text
+
+
 def find_source_chunk(item, chunks):
 
     source_text = str(item.get("source_text", "")).strip()

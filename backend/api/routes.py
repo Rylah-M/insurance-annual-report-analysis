@@ -716,11 +716,29 @@ def indicator_result(task_id: str) -> dict[str, Any]:
             return "集团"
         return text
 
+    def normalize_company(company: Any) -> str:
+        text = str(company or "").strip()
+        mapping = {
+            "中国人保": "人保",
+            "中国太保": "太保",
+            "中国太平": "太平",
+            "中国平安": "平安",
+            "中国阳光": "阳光",
+            "阳光保险": "阳光",
+            "众安在线": "众安",
+        }
+        for full, short in mapping.items():
+            if full in text:
+                return short
+        return text
+
     rows = []
     for item in results:
         rows.append(
             {
-                "company": item.get("company", task.get("company", "")),
+                "company": normalize_company(
+                    item.get("company", task.get("company", ""))
+                ),
                 "year": item.get("year", task.get("year", "")),
                 "quarter": task.get("quarter", ""),
                 "market": task.get("market", ""),
@@ -739,7 +757,7 @@ def indicator_result(task_id: str) -> dict[str, Any]:
     return {
         "task_id": task_id,
         "status": "success",
-        "company": task.get("company", ""),
+        "company": normalize_company(task.get("company", "")),
         "year": task.get("year", ""),
         "quarter": task.get("quarter", ""),
         "market": task.get("market", ""),
