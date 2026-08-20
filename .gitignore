@@ -31,3 +31,4 @@ agents/**/parse_v1/output/
 agents/**/output/
 agents/**/chunk/
 agents/**/__pycache__/
+output_chunks_v2/
