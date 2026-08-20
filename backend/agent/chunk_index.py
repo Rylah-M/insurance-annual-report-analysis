@@ -45,6 +45,16 @@ QUARTER_ORDER = {"Q4": 0, "Q3": 1, "Q2": 2, "Q1": 3}
 QUARTER_BONUS = {"Q4": 1.5, "Q3": 1.0, "Q2": 0.5, "Q1": 0.0}
 SECTION_BONUS = 3.0
 
+# 数据库使用两字短名（同事已归一化），chunk 文件仍保留全称，检索时互相兼容。
+COMPANY_NAME_MAP = {
+    "人保": "中国人保",
+    "太保": "中国太保",
+    "太平": "中国太平",
+    "平安": "中国平安",
+    "阳光": "中国阳光",
+    "众安": "众安在线",
+}
+
 # 战略/总览类章节：回答“方针、原因、经营策略”类问题时优先召回。
 STRATEGIC_SECTION_KEYWORDS = (
     "管理层讨论与分析",
@@ -88,6 +98,14 @@ def _query_expansion(question: str) -> list[str]:
 def _section_bonus(section: str | None) -> float:
     text = section or ""
     return SECTION_BONUS if any(keyword in text for keyword in STRATEGIC_SECTION_KEYWORDS) else 0.0
+
+
+def _company_matches(doc_company: str, query_company: str) -> bool:
+    """chunk 公司名（全称）与查询公司名（短名/全称）双向兼容匹配。"""
+    if doc_company == query_company:
+        return True
+    full = COMPANY_NAME_MAP.get(query_company)
+    return bool(full) and doc_company == full
 
 
 def _report_key(filename: str) -> str:
@@ -343,7 +361,7 @@ def retrieve_chunks(
         return []
     pool = docs
     if company:
-        pool = [doc for doc in pool if doc["company"] == company]
+        pool = [doc for doc in pool if _company_matches(doc["company"], company)]
     if year:
         year_pool = [doc for doc in pool if doc["year"] == year]
         if year_pool:
