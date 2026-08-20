@@ -247,10 +247,22 @@ export type ChatSource = {
   confidence_score: number | null;
 };
 
+export type ChatChunkSource = {
+  company: string;
+  year: number | null;
+  quarter: string | null;
+  market: string | null;
+  section: string | null;
+  title: string | null;
+  excerpt: string | null;
+  score: number | null;
+};
+
 export type ChatResponse = {
   question: string;
   answer: string;
   source: ChatSource[];
+  chunk_sources?: ChatChunkSource[];
   context?: {
     company: string | null;
     year: number | null;

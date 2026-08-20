@@ -326,7 +326,7 @@ def _bm25_scores(
     return scores
 
 
-def _make_excerpt(content: str, query_tokens: list[str], max_len: int = 420) -> str:
+def _make_excerpt(content: str, query_tokens: list[str], max_len: int = 650) -> str:
     """围绕首个命中词取上下文窗口，找不到命中则取正文开头。"""
     text = _WHITESPACE_RE.sub(" ", content.replace("#", " ")).strip()
     terms = sorted(
@@ -339,8 +339,8 @@ def _make_excerpt(content: str, query_tokens: list[str], max_len: int = 420) -> 
             best_pos = pos
     if best_pos < 0:
         return text[:max_len] + ("…" if len(text) > max_len else "")
-    start = max(0, best_pos - 140)
-    end = min(len(text), best_pos + 280)
+    start = max(0, best_pos - 200)
+    end = min(len(text), best_pos + 450)
     excerpt = text[start:end]
     if start > 0:
         excerpt = "…" + excerpt

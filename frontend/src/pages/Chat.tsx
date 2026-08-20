@@ -71,6 +71,7 @@ type Message = {
   role: "user" | "assistant";
   content: string;
   sources?: ChatResponse["source"];
+  chunkSources?: ChatResponse["chunk_sources"];
 };
 
 export function Chat({ active = true }: { active?: boolean }) {
@@ -96,7 +97,12 @@ export function Chat({ active = true }: { active?: boolean }) {
       .then((response) => {
         setMessages((current) => [
           ...current,
-          { role: "assistant", content: response.answer, sources: response.source }
+          {
+            role: "assistant",
+            content: response.answer,
+            sources: response.source,
+            chunkSources: response.chunk_sources
+          }
         ]);
       })
       .catch(() => {
@@ -125,7 +131,9 @@ export function Chat({ active = true }: { active?: boolean }) {
           {messages.length === 0 && (
             <div className="chat-empty">
               <Bot size={34} />
-              <p>输入业务问题，Agent 将从结构化指标库中检索数据并回答。</p>
+              <p>
+                输入业务问题，Agent 将从结构化指标库与年报原文知识库中检索数据并回答。
+              </p>
               <div className="suggestion-row">
                 {SUGGESTIONS.map((suggestion) => (
                   <button key={suggestion} onClick={() => submit(suggestion)}>
@@ -158,6 +166,32 @@ export function Chat({ active = true }: { active?: boolean }) {
                     </ul>
                   </details>
                 )}
+                {message.chunkSources && message.chunkSources.length > 0 && (
+                  <details className="chat-sources">
+                    <summary>
+                      查看年报原文（{message.chunkSources.length}）
+                    </summary>
+                    <ul>
+                      {message.chunkSources.map((chunk, chunkIndex) => (
+                        <li
+                          key={`${chunk.company}-${chunk.section}-${chunkIndex}`}
+                        >
+                          <strong>
+                            {chunk.company} {chunk.year ?? ""}年{" "}
+                            {chunk.quarter} {chunk.market} · {chunk.section}
+                          </strong>
+                          {chunk.excerpt ? (
+                            <div className="chat-source-excerpt">
+                              {chunk.excerpt.length > 140
+                                ? `${chunk.excerpt.slice(0, 140)}…`
+                                : chunk.excerpt}
+                            </div>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
               </div>
             </div>
           ))}
@@ -168,7 +202,9 @@ export function Chat({ active = true }: { active?: boolean }) {
               </div>
               <div className="chat-bubble">
                 <Loader2 className="spin" size={18} />
-                <span className="muted">正在检索指标库并生成回答...</span>
+                <span className="muted">
+                  正在检索指标库与年报原文知识库并生成回答...
+                </span>
               </div>
             </div>
           )}
