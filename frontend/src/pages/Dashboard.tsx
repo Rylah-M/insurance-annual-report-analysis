@@ -42,13 +42,9 @@ export function Dashboard({
 
   const periods = useMemo(
     () =>
-      Array.from(
-        new Set(
-          records
-            .map((row) => String(row.report_period ?? ""))
-            .filter(Boolean)
-        )
-      ).sort(),
+      ["Q1", "Q2", "Q3", "Q4"].filter((quarter) =>
+        records.some((row) => String(row.report_period ?? "").endsWith(quarter))
+      ),
     [records]
   );
 
@@ -62,7 +58,7 @@ export function Dashboard({
         String(row.indicator_name ?? "") + String(row.indicator_standard_name ?? "");
       if (companyFilter && company !== companyFilter) return false;
       if (yearFilter && year !== yearFilter) return false;
-      if (periodFilter && period !== periodFilter) return false;
+      if (periodFilter && !period.endsWith(periodFilter)) return false;
       if (keyword && !indicator.toLowerCase().includes(keyword)) return false;
       return true;
     });
@@ -83,7 +79,8 @@ export function Dashboard({
       api.databaseDownload({
         company: companyFilter || undefined,
         year: yearFilter || undefined,
-        report_period: periodFilter || undefined,
+        report_period:
+          yearFilter && periodFilter ? `${yearFilter}${periodFilter}` : undefined,
         indicator: indicatorFilter.trim() || undefined,
         filename: fileName.trim() || undefined
       }),
@@ -94,7 +91,7 @@ export function Dashboard({
     <section className="page">
       <header>
         <p>Dashboard</p>
-        <h1>上市财险公司年报智能分析 Agent</h1>
+        <h1>保险公司年报智能分析Agent</h1>
       </header>
 
       <div className="quick-actions">
