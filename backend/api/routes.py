@@ -497,7 +497,13 @@ def download_report(
         "pdf": "application/pdf",
         "json": "application/json; charset=utf-8",
     }
-    return FileResponse(path, media_type=media_types.get(format, "application/octet-stream"))
+    ext = "md" if key == "markdown" else key
+    download_name = f"{company}{int(year)}年经营分析报告.{ext}"
+    return FileResponse(
+        path,
+        media_type=media_types.get(format, "application/octet-stream"),
+        filename=download_name,
+    )
 
 
 @router.get("/report/artifacts")

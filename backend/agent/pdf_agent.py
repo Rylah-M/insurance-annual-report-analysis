@@ -148,53 +148,6 @@ def build_pdf(data: dict[str, Any], output_path: str | Path) -> str:
         )
         story.append(table)
 
-    trend_table_data = data.get("trend_table") or {}
-    trend_years = trend_table_data.get("years") or []
-    trend_rows = trend_table_data.get("rows") or []
-    if trend_years and trend_rows:
-        story.append(Paragraph("近年主要指标趋势", heading_style))
-        header = ["指标"] + [str(year) for year in trend_years]
-        table_rows = [header]
-        for row in trend_rows:
-            values = row.get("values", {})
-            table_rows.append(
-                [str(row.get("indicator", ""))]
-                + [
-                    (
-                        f"{values[year]:,.2f}"
-                        if year in values and values[year] is not None
-                        else "-"
-                    )
-                    for year in trend_years
-                ]
-            )
-        trend_table = Table(
-            table_rows,
-            colWidths=[70 * mm] + [30 * mm] * len(trend_years),
-            repeatRows=1,
-        )
-        trend_table.setStyle(
-            TableStyle(
-                [
-                    ("FONTNAME", (0, 0), (-1, -1), "STSong-Light"),
-                    ("FONTSIZE", (0, 0), (-1, -1), 8),
-                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f1f5f9")),
-                    ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#d7dee8")),
-                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-                    ("LEFTPADDING", (0, 0), (-1, -1), 5),
-                    ("RIGHTPADDING", (0, 0), (-1, -1), 5),
-                    ("TOPPADDING", (0, 0), (-1, -1), 4),
-                    ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-                ]
-            )
-        )
-        story.append(trend_table)
-    else:
-        story.append(Paragraph("近年主要指标趋势", heading_style))
-        story.append(
-            Paragraph("当前数据库暂无可用的多年趋势数据。", body_style)
-        )
-
     story.append(Paragraph("分析结论", heading_style))
     for narrative in data.get("narratives", []):
         story.append(Paragraph(narrative.get("section", ""), heading_style))

@@ -355,14 +355,18 @@ def _find_report_chunks(company: str, year: int) -> Path | None:
     except Exception:
         pass
 
-    output_root = (
+    aliases = COMPANY_ALIASES.get(company, [company])
+    # 优先使用统一重切后的语义化知识库（output_chunks_v2），其次解析产物
+    roots = [
+        Path(__file__).resolve().parents[2] / "output_chunks_v2",
         Path(__file__).resolve().parents[2]
         / "agents"
         / "parse-agent0820"
-        / "output"
-    )
-    aliases = COMPANY_ALIASES.get(company, [company])
-    if output_root.exists():
+        / "output",
+    ]
+    for output_root in roots:
+        if not output_root.exists():
+            continue
         for directory in sorted(output_root.iterdir(), reverse=True):
             if not directory.is_dir() or str(year) not in directory.name:
                 continue
@@ -503,14 +507,14 @@ def _generate_llm_highlights(
   "non_car": "非车险业务分析正文",
   "trend": "同比与趋势分析正文",
   "highlights": "经营特色与竞争优势分析正文",
-  "references": {
+  "references": {{
     "market": ["市场章节引用的 chunk_id 列表"],
     "structure": ["业务结构章节引用的 chunk_id 列表"],
     "car": ["车险章节引用的 chunk_id 列表"],
     "non_car": ["非车险章节引用的 chunk_id 列表"],
     "trend": ["同比趋势章节引用的 chunk_id 列表"],
     "highlights": ["经营特色章节引用的 chunk_id 列表"]
-  }
+  }}
 }}
 """
     try:
@@ -776,35 +780,6 @@ def build_report_data(df: pd.DataFrame, company: str, year: int) -> dict[str, An
         for key, title in section_mapping:
             if llm_highlights.get(key):
                 narratives.append({"section": title, "content": llm_highlights[key]})
-
-    def chunk_ids_from_text(text: str) -> list[str]:
-        return list(dict.fromkeys(re.findall(r"chunk_id:\s*(\S+)", text or "")))
-
-    llm_refs = llm_highlights.get("references") or {}
-    if not isinstance(llm_refs, dict):
-        llm_refs = {}
-    fallback_refs = {
-        "market": chunk_ids_from_text(operating_text),
-        "structure": chunk_ids_from_text(operating_text),
-        "trend": chunk_ids_from_text(operating_text),
-        "highlights": chunk_ids_from_text(operating_text),
-        "car": chunk_ids_from_text(car_text),
-        "non_car": chunk_ids_from_text(non_car_text),
-    }
-    reference_lines = []
-    for key, title in section_mapping:
-        items = llm_refs.get(key)
-        if not items or all(
-            str(item).strip() == "数据库结构化指标库" for item in items
-        ):
-            items = fallback_refs.get(key) or items or ["数据库结构化指标库"]
-        reference_lines.append(
-            f"【{title}】"
-            + "；".join(
-                str(item).strip() for item in items if str(item).strip()
-            )
-        )
-    narratives.append({"section": "引用来源", "content": "\n".join(reference_lines)})
 
     key_findings = []
     if premium is not None:
