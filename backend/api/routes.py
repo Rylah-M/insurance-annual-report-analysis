@@ -268,7 +268,11 @@ def companies() -> list[str]:
 @router.get("/years")
 def years() -> list[int]:
     df = load_database()
-    return sorted(int(year) for year in df["year"].dropna().unique().tolist())
+    result = sorted(int(year) for year in df["year"].dropna().unique().tolist())
+    # 年份下拉始终包含最新年度 2026（即使库里尚未收录该年份数据）
+    if 2026 not in result:
+        result.append(2026)
+    return sorted(result)
 
 
 @router.get("/quarters")
