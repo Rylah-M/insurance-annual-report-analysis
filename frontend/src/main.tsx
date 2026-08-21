@@ -77,7 +77,7 @@ function App() {
         <div className="brand">
           <Bot size={26} />
           <div>
-            <strong>年报分析 Agent</strong>
+            <strong>保险行业年报智能分析</strong>
             <span>财险上市公司</span>
           </div>
         </div>
