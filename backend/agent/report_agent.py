@@ -361,17 +361,26 @@ def _find_report_chunks(company: str, year: int) -> Path | None:
         / "parse-agent0820"
         / "output"
     )
-    if not output_root.exists():
-        return None
     aliases = COMPANY_ALIASES.get(company, [company])
-    for directory in sorted(output_root.iterdir(), reverse=True):
-        if not directory.is_dir() or str(year) not in directory.name:
-            continue
-        if not any(alias in directory.name for alias in aliases):
-            continue
-        chunks_file = next(directory.glob("*_chunks.json"), None)
-        if chunks_file:
-            return chunks_file
+    if output_root.exists():
+        for directory in sorted(output_root.iterdir(), reverse=True):
+            if not directory.is_dir() or str(year) not in directory.name:
+                continue
+            if not any(alias in directory.name for alias in aliases):
+                continue
+            chunks_file = next(directory.glob("*_chunks.json"), None)
+            if chunks_file:
+                return chunks_file
+    # 兜底：指标提取 Agent 的 chunk 目录也保存了解析后的 chunks。
+    chunk_dir = (
+        Path(__file__).resolve().parents[2] / "agents" / "zd-agent0811" / "chunk"
+    )
+    if chunk_dir.exists():
+        for chunks_file in sorted(chunk_dir.glob("*_chunks.json"), reverse=True):
+            if str(year) in chunks_file.name and any(
+                alias in chunks_file.name for alias in aliases
+            ):
+                return chunks_file
     return None
 
 
@@ -784,7 +793,11 @@ def build_report_data(df: pd.DataFrame, company: str, year: int) -> dict[str, An
     }
     reference_lines = []
     for key, title in section_mapping:
-        items = llm_refs.get(key) or fallback_refs.get(key) or ["数据库结构化指标库"]
+        items = llm_refs.get(key)
+        if not items or all(
+            str(item).strip() == "数据库结构化指标库" for item in items
+        ):
+            items = fallback_refs.get(key) or items or ["数据库结构化指标库"]
         reference_lines.append(
             f"【{title}】"
             + "；".join(
