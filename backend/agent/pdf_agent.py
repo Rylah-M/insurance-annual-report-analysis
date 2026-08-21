@@ -121,21 +121,16 @@ def build_pdf(data: dict[str, Any], output_path: str | Path) -> str:
 
     for section in data.get("sections", []):
         story.append(Paragraph(section["category"], heading_style))
-        rows = [["指标", "数值", "业务口径", "置信度"]]
+        rows = [["指标", "数值", "业务口径"]]
         for indicator in section.get("indicators", []):
             rows.append(
                 [
                     indicator.get("indicator", ""),
                     _format_number(indicator.get("value"), indicator.get("unit")),
                     indicator.get("business_scope") or "-",
-                    (
-                        f"{indicator.get('confidence_score'):.2f}"
-                        if indicator.get("confidence_score") is not None
-                        else "-"
-                    ),
                 ]
             )
-        table = Table(rows, colWidths=[52 * mm, 48 * mm, 100 * mm, 30 * mm])
+        table = Table(rows, colWidths=[52 * mm, 48 * mm, 120 * mm])
         table.setStyle(
             TableStyle(
                 [
@@ -194,6 +189,11 @@ def build_pdf(data: dict[str, Any], output_path: str | Path) -> str:
             )
         )
         story.append(trend_table)
+    else:
+        story.append(Paragraph("近年主要指标趋势", heading_style))
+        story.append(
+            Paragraph("当前数据库暂无可用的多年趋势数据。", body_style)
+        )
 
     story.append(Paragraph("分析结论", heading_style))
     for narrative in data.get("narratives", []):

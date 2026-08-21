@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -105,6 +106,7 @@ def _now_text() -> str:
 def _clean_value(value: Any) -> float | None:
     if value is None:
         return None
+    operating_text = car_text = non_car_text = ""
     try:
         number = float(value)
     except (TypeError, ValueError):
@@ -315,9 +317,6 @@ def _narrative(context: dict[str, Any]) -> list[dict[str, str]]:
         for name, metric in metrics.items()
         if metric["confidence_score"] is not None and metric["confidence_score"] < 0.5
     )
-    if risks:
-        risk_text = "；".join(f"{item['indicator']}：{item['message']}" for item in risks[:6])
-        narratives.append({"section": "风险与复核提示", "content": f"本报告识别到 {len(risks)} 项需关注事项：{risk_text}。"})
     return narratives
 
 
@@ -495,7 +494,14 @@ def _generate_llm_highlights(
   "non_car": "非车险业务分析正文",
   "trend": "同比与趋势分析正文",
   "highlights": "经营特色与竞争优势分析正文",
-  "references": ["引用的 section/chunk_id 列表"]
+  "references": {
+    "market": ["市场章节引用的 chunk_id 列表"],
+    "structure": ["业务结构章节引用的 chunk_id 列表"],
+    "car": ["车险章节引用的 chunk_id 列表"],
+    "non_car": ["非车险章节引用的 chunk_id 列表"],
+    "trend": ["同比趋势章节引用的 chunk_id 列表"],
+    "highlights": ["经营特色章节引用的 chunk_id 列表"]
+  }
 }}
 """
     try:
@@ -524,11 +530,7 @@ def _generate_llm_highlights(
                 "non_car": str(data.get("non_car", "")).strip(),
                 "trend": str(data.get("trend", "")).strip(),
                 "highlights": str(data.get("highlights", "")).strip(),
-                "references": [
-                    str(item).strip()
-                    for item in (data.get("references") or [])
-                    if str(item).strip()
-                ],
+                "references": data.get("references") or {},
             }
     except Exception:
         return None
@@ -592,7 +594,14 @@ def _fallback_highlights(context: dict[str, Any]) -> dict[str, str]:
             f"成本管控、偿付能力与市场地位等方面：{list_metrics(['综合成本率', '承保利润', '净利润', '投资收益', '核心偿付能力充足率', '综合偿付能力充足率'])}。"
             "具体可结合年报经营情况、发展战略、市场地位及渠道数字化相关章节进一步分析。"
         ),
-        "references": ["数据库结构化指标库"],
+        "references": {
+            "market": ["数据库结构化指标库"],
+            "structure": ["数据库结构化指标库"],
+            "car": ["数据库结构化指标库"],
+            "non_car": ["数据库结构化指标库"],
+            "trend": ["数据库结构化指标库"],
+            "highlights": ["数据库结构化指标库"],
+        },
     }
 
 
@@ -759,15 +768,30 @@ def build_report_data(df: pd.DataFrame, company: str, year: int) -> dict[str, An
             if llm_highlights.get(key):
                 narratives.append({"section": title, "content": llm_highlights[key]})
 
-    references = llm_highlights.get("references") or []
-    if not references:
-        references = ["数据库结构化指标库"]
-    narratives.append(
-        {
-            "section": "引用来源",
-            "content": "\n".join(str(item).strip() for item in references if str(item).strip()),
-        }
-    )
+    def chunk_ids_from_text(text: str) -> list[str]:
+        return list(dict.fromkeys(re.findall(r"chunk_id:\s*(\S+)", text or "")))
+
+    llm_refs = llm_highlights.get("references") or {}
+    if not isinstance(llm_refs, dict):
+        llm_refs = {}
+    fallback_refs = {
+        "market": chunk_ids_from_text(operating_text),
+        "structure": chunk_ids_from_text(operating_text),
+        "trend": chunk_ids_from_text(operating_text),
+        "highlights": chunk_ids_from_text(operating_text),
+        "car": chunk_ids_from_text(car_text),
+        "non_car": chunk_ids_from_text(non_car_text),
+    }
+    reference_lines = []
+    for key, title in section_mapping:
+        items = llm_refs.get(key) or fallback_refs.get(key) or ["数据库结构化指标库"]
+        reference_lines.append(
+            f"【{title}】"
+            + "；".join(
+                str(item).strip() for item in items if str(item).strip()
+            )
+        )
+    narratives.append({"section": "引用来源", "content": "\n".join(reference_lines)})
 
     key_findings = []
     if premium is not None:
@@ -898,7 +922,6 @@ def _render_html(data: dict[str, Any]) -> str:
                 f"<td>{indicator['indicator']}</td>"
                 f"<td>{_format_number(indicator['value'], indicator['unit'])}</td>"
                 f"<td>{indicator.get('business_scope') or '-'}</td>"
-                f"<td>{indicator.get('confidence_score') if indicator.get('confidence_score') is not None else '-'}</td>"
                 "</tr>"
             )
             for indicator in section["indicators"]
@@ -913,7 +936,7 @@ def _render_html(data: dict[str, Any]) -> str:
                 )
         sections_html += f"""
         <h2>{section['category']}</h2>
-        <table><thead><tr><th>指标</th><th>数值</th><th>业务口径</th><th>置信度</th></tr></thead>
+        <table><thead><tr><th>指标</th><th>数值</th><th>业务口径</th></tr></thead>
         <tbody>{rows}</tbody></table>
         {chart_html}
         """
