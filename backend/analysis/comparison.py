@@ -52,11 +52,18 @@ def _period_token(row: dict[str, Any]) -> str:
 
 
 def compare_indicator(
-    df: pd.DataFrame, indicator_name: str, year: int | None = None
+    df: pd.DataFrame,
+    indicator_name: str,
+    year: int | None = None,
+    business_scope_type: str | None = None,
 ) -> dict[str, Any]:
     metric_df = df[df["indicator_name"] == indicator_name].copy()
     if year is not None:
         metric_df = metric_df[metric_df["year"] == year]
+    if business_scope_type and "business_scope_type" in metric_df.columns:
+        metric_df = metric_df[
+            metric_df["business_scope_type"] == business_scope_type
+        ]
 
     values = []
     for row in metric_df.sort_values(["year", "company"]).itertuples():
@@ -72,6 +79,10 @@ def compare_indicator(
                 "business_scope": row.business_scope
                 if isinstance(row.business_scope, str)
                 else None,
+                "business_scope_type": row.business_scope_type
+                if hasattr(row, "business_scope_type")
+                and isinstance(row.business_scope_type, str)
+                else None,
                 "review_status": row.review_status
                 if hasattr(row, "review_status")
                 else None,
@@ -81,6 +92,7 @@ def compare_indicator(
     return {
         "indicator": indicator_name,
         "year": year,
+        "business_scope_type": business_scope_type,
         "values": values,
         "statistics": descriptive_statistics(metric_df),
         "ranking": rank_metric(metric_df, indicator_name),
@@ -119,6 +131,10 @@ def company_overview(
             "business_scope": row.business_scope
             if isinstance(row.business_scope, str)
             else None,
+            "business_scope_type": row.business_scope_type
+            if hasattr(row, "business_scope_type")
+            and isinstance(row.business_scope_type, str)
+            else None,
             "confidence_score": None
             if not hasattr(row, "confidence_score") or pd.isna(row.confidence_score)
             else float(row.confidence_score),
@@ -128,6 +144,7 @@ def company_overview(
             "value": metric["value"],
             "unit": metric["unit"],
             "business_scope": metric["business_scope"],
+            "business_scope_type": metric["business_scope_type"],
         }
         for category, names in INDICATOR_CATEGORIES.items():
             if row.indicator_name in names:

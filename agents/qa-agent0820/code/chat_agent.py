@@ -95,6 +95,9 @@ def _metric_records(df, company: str | None, year: int | None, indicator: str | 
                 "business_scope": row.business_scope
                 if isinstance(row.business_scope, str)
                 else None,
+                "business_scope_type": row.business_scope_type
+                if isinstance(getattr(row, "business_scope_type", None), str)
+                else None,
                 "source_text": row.source_text
                 if isinstance(getattr(row, "source_text", None), str)
                 else None,
@@ -151,11 +154,13 @@ def _build_context(records: list[dict[str, Any]], question: str) -> str:
     lines = ["以下为数据库中检索到的相关指标记录："]
     for record in records:
         scope = record.get("business_scope") or ""
+        scope_type = record.get("business_scope_type") or ""
         source = (record.get("source_text") or "").strip()
         lines.append(
             f"- {record['company']} {record['year']}年 {record['indicator']}："
             f"{_format_value(record)}"
             + (f"（口径：{scope}）" if scope else "")
+            + (f"（标准口径：{scope_type}）" if scope_type else "")
             + (f"；原文：{source}" if source else "")
         )
     return "\n".join(lines)

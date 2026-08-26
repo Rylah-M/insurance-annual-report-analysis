@@ -66,7 +66,10 @@ export function Report({
                 <div key={`${section}-${row.indicator_id}`} className="report-row">
                   <div>
                     <strong>{row.indicator}</strong>
-                    <span>{row.business_scope ?? "暂无业务范围"}</span>
+                    <span>
+                      {row.business_scope ?? "暂无业务范围"}
+                      {row.business_scope_type ? ` · ${row.business_scope_type}` : ""}
+                    </span>
                   </div>
                   <b>{formatValue(row.value, row.unit)}</b>
                 </div>

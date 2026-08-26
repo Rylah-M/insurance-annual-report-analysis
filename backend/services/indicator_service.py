@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 import shutil
@@ -22,6 +23,17 @@ DB_DIR = AGENT_DIR / "database_result"
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 PROJECT_DATABASE_DIR = PROJECT_ROOT / "database"
 PROJECT_DATABASE_CSV = PROJECT_DATABASE_DIR / "database_result.csv"
+
+_SCOPE_STANDARD_PATH = CODE_DIR / "business_scope_standard.py"
+_scope_spec = importlib.util.spec_from_file_location(
+    "business_scope_standard", _SCOPE_STANDARD_PATH
+)
+assert _scope_spec and _scope_spec.loader is not None
+_scope_standard = importlib.util.module_from_spec(_scope_spec)
+_scope_spec.loader.exec_module(_scope_standard)
+
+BUSINESS_SCOPE_TYPES = _scope_standard.BUSINESS_SCOPE_TYPES
+classify_business_scope_type = _scope_standard.classify_business_scope_type
 
 STEPS = [
     ("指标召回", "chunk_indicator_match.py", 20),

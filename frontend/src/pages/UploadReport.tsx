@@ -27,6 +27,8 @@ function cleanLogLine(line: string) {
   return line;
 }
 
+const BUSINESS_SCOPE_TYPES = ["集团口径", "财险口径", "特殊财险口径"];
+
 export function UploadReport() {
   const [file, setFile] = useState<File | null>(null);
   const [company, setCompany] = useState("");
@@ -487,6 +489,7 @@ export function UploadReport() {
                     <th>数值</th>
                     <th>单位</th>
                     <th>业务范围</th>
+                    <th>标准业务口径</th>
                     <th>审核状态</th>
                   </tr>
                 </thead>
@@ -521,6 +524,22 @@ export function UploadReport() {
                             updateRow(index, "business_scope", event.target.value)
                           }
                         />
+                      </td>
+                      <td>
+                        <select
+                          className="table-input"
+                          value={String(row.business_scope_type ?? "")}
+                          onChange={(event) =>
+                            updateRow(index, "business_scope_type", event.target.value)
+                          }
+                        >
+                          <option value="">请选择</option>
+                          {BUSINESS_SCOPE_TYPES.map((type) => (
+                            <option key={type} value={type}>
+                              {type}
+                            </option>
+                          ))}
+                        </select>
                       </td>
                       <td>
                         <select

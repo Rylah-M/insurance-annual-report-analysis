@@ -424,6 +424,7 @@ database/
 | indicator_value  | 指标值   |
 | unit             | 单位     |
 | business_scope   | 业务范围 |
+| business_scope_type | 标准化口径分类：集团口径 / 财险口径 / 特殊财险口径 |
 | source_file      | 来源文件 |
 | source_page      | 页码     |
 | source_text      | 原文     |

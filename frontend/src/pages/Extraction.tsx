@@ -216,6 +216,7 @@ export function Extraction({ taskId }: { taskId: string }) {
                   <th>单位</th>
                   <th>置信度</th>
                   <th>业务范围</th>
+                  <th>标准业务口径</th>
                 </tr>
               </thead>
               <tbody>
@@ -229,6 +230,7 @@ export function Extraction({ taskId }: { taskId: string }) {
                     <td>{row.unit || "-"}</td>
                     <td>{row.confidence_score !== "" ? row.confidence_score : "-"}</td>
                     <td>{row.business_scope || "-"}</td>
+                    <td>{row.business_scope_type || "-"}</td>
                   </tr>
                 ))}
               </tbody>

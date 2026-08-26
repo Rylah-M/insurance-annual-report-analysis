@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS indicator_data (
     indicator_value REAL,
     unit TEXT,
     business_scope TEXT,
+    business_scope_type TEXT,
     business_type TEXT,
     source_file TEXT,
     source_page TEXT,
@@ -149,6 +150,7 @@ def sync_from_csv(
                     record.get("indicator_value"),
                     record.get("unit"),
                     record.get("business_scope"),
+                    record.get("business_scope_type"),
                     record.get("business_type"),
                     record.get("source_file"),
                     record.get("source_page"),
@@ -164,9 +166,10 @@ def sync_from_csv(
             INSERT INTO indicator_data
             (company_id, company, year, report_period, indicator_id, indicator_name,
              indicator_standard_name, indicator_value, unit, business_scope,
-             business_type, source_file, source_page, source_chunk_id, source_text,
-             extraction_time, confidence_score, review_status)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             business_scope_type, business_type, source_file, source_page,
+             source_chunk_id, source_text, extraction_time, confidence_score,
+             review_status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             indicator_rows,
         )

@@ -54,6 +54,7 @@ export type IndicatorValue = {
   value: number | null;
   unit: string;
   business_scope: string | null;
+  business_scope_type: string | null;
   confidence_score: number | null;
   review_status: string | null;
 };
@@ -65,6 +66,7 @@ export type ComparisonValue = {
   value: number | null;
   unit: string;
   business_scope?: string | null;
+  business_scope_type?: string | null;
   review_status?: string | null;
 };
 
@@ -116,6 +118,7 @@ export type CompanyPeriodMetric = {
   value: number | null;
   unit: string;
   business_scope: string | null;
+  business_scope_type: string | null;
   source_text: string | null;
 };
 
@@ -133,7 +136,12 @@ export type CompanyOverview = {
   available_value_count: number;
   metrics: Record<
     string,
-    { value: number | null; unit: string; business_scope: string | null }
+    {
+      value: number | null;
+      unit: string;
+      business_scope: string | null;
+      business_scope_type: string | null;
+    }
   >;
   categories: Record<
     string,
@@ -143,6 +151,7 @@ export type CompanyOverview = {
       value: number | null;
       unit: string;
       business_scope: string | null;
+      business_scope_type: string | null;
       confidence_score: number | null;
       review_status: string | null;
     }>
@@ -164,6 +173,7 @@ export type CompanyReport = {
       value: number | null;
       unit: string;
       business_scope: string | null;
+      business_scope_type: string | null;
       confidence_score: number | null;
       review_status: string | null;
     }>
@@ -182,6 +192,7 @@ export type ReportIndicator = {
   value: number | null;
   unit: string | null;
   business_scope: string | null;
+  business_scope_type: string | null;
   confidence_score: number | null;
   review_status: string | null;
 };
@@ -243,6 +254,7 @@ export type ChatSource = {
   value: number | null;
   unit: string | null;
   source_text: string | null;
+  business_scope_type?: string | null;
   source_page: string | null;
   confidence_score: number | null;
 };
@@ -347,6 +359,7 @@ export type ExtractionResult = {
     indicator_value: string;
     unit: string;
     business_scope: string;
+    business_scope_type: string;
     source_text: string;
     confidence_score: string;
     review_status?: string;
@@ -395,23 +408,26 @@ export const api = {
     if (quarter) params.set("quarter", quarter);
     return request<CompanyPeriodMetric[]>(`/api/data?${params}`);
   },
-  compareMatrix: (year: number, quarter?: string) => {
+  compareMatrix: (year: number, quarter?: string, businessScopeType?: string) => {
     const params = new URLSearchParams({ year: String(year) });
     if (quarter) params.set("quarter", quarter);
+    if (businessScopeType) params.set("business_scope_type", businessScopeType);
     return request<CompareMatrix>(`/api/compare?${params}`);
   },
   indicatorValue: (company: string, indicator: string, year: number) => {
     const params = new URLSearchParams({ company, indicator, year: String(year) });
     return request<IndicatorValue>(`/indicator/value?${params}`);
   },
-  comparison: (indicator: string, year?: number) => {
+  comparison: (indicator: string, year?: number, businessScopeType?: string) => {
     const params = new URLSearchParams({ indicator });
     if (year) params.set("year", String(year));
+    if (businessScopeType) params.set("business_scope_type", businessScopeType);
     return request<Comparison>(`/api/analysis/comparison?${params}`);
   },
-  barChart: (indicator: string, year?: number) => {
+  barChart: (indicator: string, year?: number, businessScopeType?: string) => {
     const params = new URLSearchParams({ indicator });
     if (year) params.set("year", String(year));
+    if (businessScopeType) params.set("business_scope_type", businessScopeType);
     return request<ChartPayload>(`/chart/bar?${params}`);
   },
   trendChart: (company: string, indicator: string) => {

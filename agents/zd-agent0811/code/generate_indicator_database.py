@@ -10,6 +10,7 @@ from xml.sax.saxutils import escape
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from tag_utils import resolve_tag, resolve_chunk_file, OUTPUT_DIR, PROJECT_ROOT
+from business_scope_standard import classify_business_scope_type
 
 
 # =========================
@@ -44,6 +45,7 @@ HEADERS = [
     "indicator_value",
     "unit",
     "business_scope",
+    "business_scope_type",
     "business_type",
     "source_file",
     "source_page",
@@ -67,6 +69,7 @@ DICTIONARY_ROWS = [
     ["indicator_value", "指标值", "数字/文本", "97.1", "来自 extracted_indicator_result.json。"],
     ["unit", "单位", "文本", "% / 百万元", "来自 extracted_indicator_result.json。"],
     ["business_scope", "业务范围", "文本", "太保产险单体", "来自 extracted_indicator_result.json。"],
+    ["business_scope_type", "标准化口径分类", "文本", "集团口径 / 财险口径 / 特殊财险口径", "在原始 business_scope 基础上由标准化层生成，可人工修正。"],
     ["business_type", "业务类型", "文本", "车险 / 非车险", "按指标名称简单推断；无法推断时留空。"],
     ["source_file", "来源文件", "文本", "chunks.json", "当前输入 chunks 文件名。"],
     ["source_page", "页码", "文本", "P56", "当前 chunks 未提供时留空。"],
@@ -121,26 +124,10 @@ def infer_business_type(indicator_name):
 
 
 def normalize_business_scope(scope):
-    """统一业务范围口径：财险→财险，集团/合并→集团，其他保留原文作为特殊标注。"""
+    """保留原始业务范围；标准化分类由 business_scope_type 承担。"""
     if not scope:
         return ""
-    text = str(scope).strip()
-    if any(marker in text for marker in ("（", "）", "(", ")", "【", "】")):
-        # 带括号的属于特别说明（如“财险（不包含信农险）”），保留原文。
-        return text
-    property_markers = (
-        "财险", "产险", "财产保险", "财产险", "財險", "產險", "財產保險",
-        "property insurance", "非寿险", "非壽險",
-    )
-    group_markers = (
-        "集团", "合并", "母公司", "总公司", "整体", "全集团", "集團", "合併",
-        "group",
-    )
-    if any(marker in text for marker in property_markers):
-        return "财险"
-    if any(marker in text for marker in group_markers):
-        return "集团"
-    return text
+    return str(scope).strip()
 
 
 def normalize_company(company):
@@ -218,6 +205,9 @@ def build_database_rows(extracted_results, chunks):
                 "indicator_value": item.get("indicator_value", ""),
                 "unit": item.get("unit", ""),
                 "business_scope": normalize_business_scope(item.get("business_scope", "")),
+                "business_scope_type": classify_business_scope_type(
+                    item.get("business_scope_type", item.get("business_scope", ""))
+                ),
                 "business_type": infer_business_type(indicator_name),
                 "source_file": source_file,
                 "source_page": source_page,
@@ -268,6 +258,12 @@ def update_database_csv(rows):
         with open(database_path, "r", encoding="utf-8-sig", newline="") as f:
             reader = csv.DictReader(f)
             existing_rows = list(reader)
+
+    for row in existing_rows:
+        if not row.get("business_scope_type"):
+            row["business_scope_type"] = classify_business_scope_type(
+                row.get("business_scope", "")
+            )
 
     replacement_keys = {report_key(row) for row in rows}
 
@@ -365,7 +361,7 @@ def write_xlsx(indicator_rows, output_excel_file):
 
     indicator_widths = [
         14, 24, 10, 14, 14, 22, 22, 16, 10,
-        32, 16, 18, 12, 22, 60, 16, 16, 14
+        32, 16, 16, 18, 12, 22, 60, 16, 16, 14
     ]
     dictionary_widths = [26, 28, 16, 30, 46]
 

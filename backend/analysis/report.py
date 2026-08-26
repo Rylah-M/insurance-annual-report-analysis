@@ -25,6 +25,10 @@ def _metric_payload(row: pd.Series) -> dict[str, Any]:
         "business_scope": None
         if pd.isna(row.get("business_scope"))
         else row.get("business_scope"),
+        "business_scope_type": None
+        if "business_scope_type" not in row.index
+        or pd.isna(row.get("business_scope_type"))
+        else row.get("business_scope_type"),
         "confidence_score": None
         if pd.isna(row.get("confidence_score"))
         else float(row.get("confidence_score")),

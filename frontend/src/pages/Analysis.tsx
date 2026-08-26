@@ -14,6 +14,7 @@ import { AnalysisSelector } from "../components/Selector";
 const BUSINESS_SCALE = ["原保险保费收入", "车险保费收入", "非车险保费收入"];
 const PROFITABILITY = ["综合成本率", "综合赔付率", "综合费用率", "承保利润", "净利润"];
 const RISK = ["核心偿付能力充足率", "综合偿付能力充足率"];
+const BUSINESS_SCOPE_TYPES = ["集团口径", "财险口径", "特殊财险口径"];
 
 function findMetric(rows: CompanyPeriodMetric[], name: string) {
   return rows.find((row) => row.indicator === name);
@@ -26,7 +27,8 @@ function metricCards(rows: CompanyPeriodMetric[], names: string[]) {
       name,
       value: metric?.value ?? null,
       unit: metric?.unit ?? "",
-      scope: metric?.business_scope ?? undefined
+      scope: metric?.business_scope ?? undefined,
+      scopeType: metric?.business_scope_type ?? undefined
     };
   });
 }
@@ -46,6 +48,7 @@ export function Analysis({
   const [year, setYear] = useState<number | undefined>();
   const [quarter, setQuarter] = useState("");
   const [indicator, setIndicator] = useState("综合成本率");
+  const [scopeType, setScopeType] = useState("");
   const [metrics, setMetrics] = useState<CompanyPeriodMetric[]>([]);
   const [compareMatrix, setCompareMatrix] = useState<CompareMatrix | null>(null);
   const [premiumChart, setPremiumChart] = useState<ChartPayload | null>(null);
@@ -60,7 +63,7 @@ export function Analysis({
     if (!year && years.length) setYear(years[0]);
     if (!quarter && quarters.length) setQuarter(quarters[0]);
     if (!indicator && indicators.length) setIndicator(indicators[0].indicator_name);
-  }, [companies, years, quarters, indicators, company, year, quarter, indicator]);
+  }, [companies, years, quarters, indicators, company, year, quarter, indicator, scopeType]);
 
   const runAnalysis = () => {
     if (!company || !year) return;
@@ -68,11 +71,11 @@ export function Analysis({
     setError(null);
     Promise.all([
       api.companyPeriodData(company, year, quarter),
-      api.compareMatrix(year, quarter),
-      api.barChart("原保险保费收入", year),
-      api.barChart("综合成本率", year),
+      api.compareMatrix(year, quarter, scopeType || undefined),
+      api.barChart("原保险保费收入", year, scopeType || undefined),
+      api.barChart("综合成本率", year, scopeType || undefined),
       api.trendChart(company, indicator),
-      api.comparison(indicator, year)
+      api.comparison(indicator, year, scopeType || undefined)
     ])
       .then(([metricRows, matrix, premium, cost, trend, comparisonData]) => {
         setMetrics(metricRows);
@@ -88,7 +91,7 @@ export function Analysis({
 
   useEffect(() => {
     runAnalysis();
-  }, [company, year, quarter, indicator]);
+  }, [company, year, quarter, indicator, scopeType]);
 
   const structureData = useMemo(() => {
     const car = findMetric(metrics, "车险保费收入");
@@ -118,6 +121,20 @@ export function Analysis({
           onYearChange={setYear}
           onQuarterChange={setQuarter}
         />
+        <label className="rank-indicator">
+          标准业务口径
+          <select
+            value={scopeType}
+            onChange={(event) => setScopeType(event.target.value)}
+          >
+            <option value="">全部口径</option>
+            {BUSINESS_SCOPE_TYPES.map((type) => (
+              <option key={type} value={type}>
+                {type}
+              </option>
+            ))}
+          </select>
+        </label>
         <button className="primary-action" onClick={runAnalysis}>
           开始分析
         </button>
@@ -135,7 +152,7 @@ export function Analysis({
               key={metric.name}
               label={metric.name}
               value={formatValue(metric.value, metric.unit)}
-              note={metric.scope}
+              note={[metric.scope, metric.scopeType].filter(Boolean).join(" · ")}
             />
           ))}
         </div>
@@ -146,7 +163,7 @@ export function Analysis({
               key={metric.name}
               label={metric.name}
               value={formatValue(metric.value, metric.unit)}
-              note={metric.scope}
+              note={[metric.scope, metric.scopeType].filter(Boolean).join(" · ")}
             />
           ))}
         </div>
@@ -157,7 +174,7 @@ export function Analysis({
               key={metric.name}
               label={metric.name}
               value={formatValue(metric.value, metric.unit)}
-              note={metric.scope}
+              note={[metric.scope, metric.scopeType].filter(Boolean).join(" · ")}
             />
           ))}
         </div>

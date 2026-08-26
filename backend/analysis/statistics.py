@@ -101,6 +101,10 @@ def rank_metric(metric_df: pd.DataFrame, indicator_name: str) -> list[dict[str, 
             "business_scope": row.business_scope
             if isinstance(row.business_scope, str)
             else None,
+            "business_scope_type": row.business_scope_type
+            if hasattr(row, "business_scope_type")
+            and isinstance(row.business_scope_type, str)
+            else None,
         }
         for row in available.itertuples()
     ]
@@ -159,6 +163,10 @@ def year_over_year(df: pd.DataFrame, company: str, indicator_name: str) -> list[
                 ),
                 "value": float(row.indicator_value),
                 "unit": row.unit,
+                "business_scope_type": row.business_scope_type
+                if hasattr(row, "business_scope_type")
+                and isinstance(row.business_scope_type, str)
+                else None,
                 "previous_value": None
                 if pd.isna(row.previous_value)
                 else float(row.previous_value),

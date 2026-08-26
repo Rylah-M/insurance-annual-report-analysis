@@ -21,6 +21,8 @@ from agent.report_agent import REPORT_DIR, build_report_data, generate_report_fi
 from database import get_db_path, list_reports, save_report_artifact
 from data_loader import dataframe_profile, load_database, records_for_json
 from services.indicator_service import (
+    BUSINESS_SCOPE_TYPES,
+    classify_business_scope_type,
     OUTPUT_DIR,
     import_database_for_task,
     read_result,
@@ -92,6 +94,9 @@ def _get_indicator_value(
         "value": None if pd.isna(value) else float(value),
         "unit": row["unit"],
         "business_scope": None if pd.isna(row["business_scope"]) else row["business_scope"],
+        "business_scope_type": None
+        if "business_scope_type" not in row or pd.isna(row["business_scope_type"])
+        else row["business_scope_type"],
         "confidence_score": None
         if "confidence_score" not in row or pd.isna(row["confidence_score"])
         else float(row["confidence_score"]),
@@ -99,8 +104,14 @@ def _get_indicator_value(
     }
 
 
-def _simple_compare(indicator: str, year: int | None) -> list[dict[str, Any]]:
-    comparison = compare_indicator(load_database(), indicator, year)
+def _simple_compare(
+    indicator: str,
+    year: int | None,
+    business_scope_type: str | None = None,
+) -> list[dict[str, Any]]:
+    comparison = compare_indicator(
+        load_database(), indicator, year, business_scope_type
+    )
     return [
         {
             "company": item["company"],
@@ -112,8 +123,14 @@ def _simple_compare(indicator: str, year: int | None) -> list[dict[str, Any]]:
     ]
 
 
-def _bar_chart(indicator: str, year: int | None) -> dict[str, Any]:
-    comparison = compare_indicator(load_database(), indicator, year)
+def _bar_chart(
+    indicator: str,
+    year: int | None,
+    business_scope_type: str | None = None,
+) -> dict[str, Any]:
+    comparison = compare_indicator(
+        load_database(), indicator, year, business_scope_type
+    )
     return {
         "title": f"{indicator}比较" if year is None else f"{year}年{indicator}比较",
         "indicator": indicator,
@@ -160,6 +177,10 @@ def _company_period_data(company: str, year: int, quarter: str | None) -> list[d
                 "business_scope": row.business_scope
                 if isinstance(row.business_scope, str)
                 else None,
+                "business_scope_type": row.business_scope_type
+                if hasattr(row, "business_scope_type")
+                and isinstance(row.business_scope_type, str)
+                else None,
                 "source_text": row.source_text
                 if hasattr(row, "source_text") and isinstance(row.source_text, str)
                 else None,
@@ -168,12 +189,20 @@ def _company_period_data(company: str, year: int, quarter: str | None) -> list[d
     return rows
 
 
-def _comparison_matrix(year: int, quarter: str | None = None) -> dict[str, Any]:
+def _comparison_matrix(
+    year: int,
+    quarter: str | None = None,
+    business_scope_type: str | None = None,
+) -> dict[str, Any]:
     df = load_database()
     normalized = _normalize_quarter(year, quarter)
     filtered = df[df["year"] == year].copy()
     if normalized and "report_period" in filtered.columns:
         filtered = filtered[filtered["report_period"] == normalized]
+    if business_scope_type and "business_scope_type" in filtered.columns:
+        filtered = filtered[
+            filtered["business_scope_type"] == business_scope_type
+        ]
     companies_list = sorted(filtered["company"].dropna().unique().tolist())
     indicators_list = sorted(filtered["indicator_name"].dropna().unique().tolist())
     rows = []
@@ -194,6 +223,7 @@ def _comparison_matrix(year: int, quarter: str | None = None) -> dict[str, Any]:
     return {
         "year": year,
         "quarter": normalized,
+        "business_scope_type": business_scope_type,
         "companies": companies_list,
         "rows": rows,
     }
@@ -320,11 +350,14 @@ def indicators() -> list[dict]:
 def comparison(
     indicator: str = Query(..., description="指标名称"),
     year: int | None = Query(None, description="年份"),
+    business_scope_type: str | None = Query(
+        None, description="标准业务口径，如 财险口径"
+    ),
 ) -> dict:
     df = load_database()
     if indicator not in set(df["indicator_name"].dropna()):
         raise HTTPException(status_code=404, detail="指标不存在")
-    return compare_indicator(df, indicator, year)
+    return compare_indicator(df, indicator, year, business_scope_type)
 
 
 @router.get("/analysis/company")
@@ -369,16 +402,22 @@ def api_indicator_value(
 def api_analysis_compare(
     indicator: str = Query(..., description="指标名称"),
     year: int | None = Query(None, description="年份"),
+    business_scope_type: str | None = Query(
+        None, description="标准业务口径，如 财险口径"
+    ),
 ) -> list[dict]:
-    return _simple_compare(indicator, year)
+    return _simple_compare(indicator, year, business_scope_type)
 
 
 @router.get("/chart/bar")
 def api_chart_bar(
     indicator: str = Query(..., description="指标名称"),
     year: int | None = Query(None, description="年份"),
+    business_scope_type: str | None = Query(
+        None, description="标准业务口径，如 财险口径"
+    ),
 ) -> dict:
-    return _bar_chart(indicator, year)
+    return _bar_chart(indicator, year, business_scope_type)
 
 
 @router.get("/chart/trend")
@@ -428,8 +467,11 @@ def api_company_period_data(
 def api_compare_matrix(
     year: int = Query(..., description="年份"),
     quarter: str | None = Query(None, description="报告期，如 Q3 或 2024Q3"),
+    business_scope_type: str | None = Query(
+        None, description="标准业务口径，如 财险口径"
+    ),
 ) -> dict:
-    return _comparison_matrix(year, quarter)
+    return _comparison_matrix(year, quarter, business_scope_type)
 
 
 @router.post("/report/generate")
@@ -742,21 +784,7 @@ def indicator_result(task_id: str) -> dict[str, Any]:
     def normalize_business_scope(scope: Any) -> str:
         if not scope:
             return ""
-        text = str(scope).strip()
-        if any(marker in text for marker in ("（", "）", "(", ")", "【", "】")):
-            return text
-        property_markers = (
-            "财险", "产险", "财产保险", "财产险", "財險", "產險", "財產保險",
-            "property insurance", "非寿险", "非壽險",
-        )
-        group_markers = (
-            "集团", "合并", "母公司", "总公司", "整体", "全集团", "集團", "合併", "group",
-        )
-        if any(marker in text for marker in property_markers):
-            return "财险"
-        if any(marker in text for marker in group_markers):
-            return "集团"
-        return text
+        return str(scope).strip()
 
     def normalize_company(company: Any) -> str:
         text = str(company or "").strip()
@@ -791,6 +819,9 @@ def indicator_result(task_id: str) -> dict[str, Any]:
                 "business_scope": normalize_business_scope(
                     item.get("business_scope", "")
                 ),
+                "business_scope_type": classify_business_scope_type(
+                    item.get("business_scope_type", item.get("business_scope", ""))
+                ),
                 "source_text": item.get("source_text", ""),
                 "confidence_score": item.get("confidence_score", ""),
                 "review_status": item.get("review_status", "待审核"),
@@ -818,6 +849,9 @@ def save_indicator_result(
     rows = payload.get("rows")
     if not isinstance(rows, list):
         raise HTTPException(status_code=400, detail="rows 必须为数组")
+    for row in rows:
+        if isinstance(row, dict) and row.get("business_scope_type") not in BUSINESS_SCOPE_TYPES:
+            row["business_scope_type"] = ""
     tag = task.get("output_name", "")
     if not tag:
         raise HTTPException(status_code=400, detail="任务缺少 output_name")
@@ -863,16 +897,22 @@ def public_indicator_value(
 def public_analysis_compare(
     indicator: str = Query(..., description="指标名称"),
     year: int | None = Query(None, description="年份"),
+    business_scope_type: str | None = Query(
+        None, description="标准业务口径，如 财险口径"
+    ),
 ) -> list[dict]:
-    return _simple_compare(indicator, year)
+    return _simple_compare(indicator, year, business_scope_type)
 
 
 @public_router.get("/chart/bar")
 def public_chart_bar(
     indicator: str = Query(..., description="指标名称"),
     year: int | None = Query(None, description="年份"),
+    business_scope_type: str | None = Query(
+        None, description="标准业务口径，如 财险口径"
+    ),
 ) -> dict:
-    return _bar_chart(indicator, year)
+    return _bar_chart(indicator, year, business_scope_type)
 
 
 @public_router.get("/chart/trend")
