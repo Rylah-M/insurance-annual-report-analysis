@@ -42,8 +42,13 @@ def resolve_chunk_file():
     """
     返回本次要处理的 chunk 文件路径：
     1. 命令行第一个参数为 *_chunks.json 路径（绝对/相对均可）时直接使用；
-    2. 否则使用 chunk 目录下最新的 *_chunks.json。
+    2. 命令行第一个参数为 tag 时，优先使用 chunk 目录下 <tag>_chunks.json；
+    3. 否则使用 chunk 目录下最新的 *_chunks.json。
     """
+    if len(sys.argv) > 1 and not sys.argv[1].endswith("_chunks.json"):
+        tag_file = os.path.join(CHUNK_DIR, f"{sys.argv[1]}_chunks.json")
+        if os.path.exists(tag_file):
+            return tag_file
     if len(sys.argv) > 1 and sys.argv[1].endswith("_chunks.json"):
         arg = sys.argv[1]
         if os.path.exists(arg):
