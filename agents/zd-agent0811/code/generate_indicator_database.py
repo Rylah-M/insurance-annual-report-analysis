@@ -244,6 +244,15 @@ def dedupe_key(row):
     )
 
 
+def report_key(row):
+    """报告级标识:同一公司+年份+报告期的旧数据整体替换,防止重复保存叠加。"""
+    return (
+        str(row.get("company", "")),
+        str(row.get("year", "")),
+        str(row.get("report_period", "")),
+    )
+
+
 # =========================
 # 4. CSV总库
 # =========================
@@ -260,12 +269,12 @@ def update_database_csv(rows):
             reader = csv.DictReader(f)
             existing_rows = list(reader)
 
-    replacement_keys = {dedupe_key(row) for row in rows}
+    replacement_keys = {report_key(row) for row in rows}
 
     kept_rows = [
         row
         for row in existing_rows
-        if dedupe_key(row) not in replacement_keys
+        if report_key(row) not in replacement_keys
     ]
 
     final_rows = kept_rows + rows
