@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import sys
 from collections import defaultdict
 from io import StringIO
@@ -123,6 +124,34 @@ RELATED_INDICATORS = {
     "非车保险服务收入": ["保险服务收入"],
     "非车非保证险保费": ["非车险保费收入", "原保险保费收入"],
 }
+
+
+# 扩散补入时的险种限定词:目标为险种级指标时,候选 chunk 必须同时包含险种词,
+# 避免把"保险服务收入""原保险保费收入"等总口径命中的 chunk 无差别补进下级指标。
+EXPAND_REQUIRED_TERMS = {
+    "车险综合成本率": ["车险", "机动车辆保险", "机动车辆险", "汽车生态", "車險", "機動車輛保險", "汽車生態", "汽车保险"],
+    "非车险综合成本率": ["非车险", "非机动车辆保险", "非机动车辆险", "非車險", "非機動車輛保險"],
+    "车险保费收入": ["车险", "机动车辆保险", "机动车辆险", "汽车生态", "車險", "機動車輛保險", "汽車生態", "汽车保险"],
+    "非车险保费收入": ["非车险", "非机动车辆保险", "非机动车辆险", "非車險", "非機動車輛保險"],
+    "农业保险保费": ["农险", "农业保险", "農險", "農業保險"],
+    "健康险保费": ["健康险", "健康保险", "健康生态", "健康生態", "健康險", "健康保險"],
+    "车险业务占比": ["车险", "机动车辆保险", "机动车辆险", "汽车生态", "車險", "機動車輛保險", "汽車生態"],
+    "非车险业务占比": ["非车险", "非机动车辆保险", "非机动车辆险", "非車險", "非機動車輛保險"],
+    "车险保险服务收入": ["车险", "机动车辆保险", "机动车辆险", "汽车生态", "車險", "機動車輛保險", "汽車生態", "汽车保险"],
+    "非车保险服务收入": ["非车险", "非机动车辆保险", "非机动车辆险", "非車險", "非機動車輛保險"],
+    "非车非保证险保费": [
+        "非车非保证", "剔除保证保险", "不含保证保险", "扣除保证保险", "排除保证保险",
+        "非車非保證", "剔除保證保險", "不含保證保險", "扣除保證保險", "排除保證保險",
+    ],
+}
+
+
+def _contains_any(item: dict, terms: list[str]) -> bool:
+    parts = [str(item.get("content") or "")]
+    for table in item.get("tables") or []:
+        parts.append(re.sub(r"<[^>]+>", " ", str(table.get("content") or "")))
+    text = " ".join(parts)
+    return any(term in text for term in terms)
 
 
 def keyword_matches(keyword, text, ntext):
@@ -250,12 +279,15 @@ extra_items = []
 for target, related in RELATED_INDICATORS.items():
 
     existing_ids = {item["chunk_id"] for item in by_indicator.get(target, [])}
+    required_terms = EXPAND_REQUIRED_TERMS.get(target)
 
     for rel in related:
 
         for item in by_indicator.get(rel, []):
 
             if item["chunk_id"] not in existing_ids:
+                if required_terms and not _contains_any(item, required_terms):
+                    continue
 
                 new_item = dict(item)
 

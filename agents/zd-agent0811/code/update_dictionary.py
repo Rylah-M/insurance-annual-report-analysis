@@ -15,6 +15,19 @@ ORIGINAL_IDS = {
     "R001", "R002", "R003",
 }
 
+# 针对既有行的关键词补充(众安/港式口径用词),幂等追加
+KEYWORD_PATCHES = {
+    "F001": ["淨溢利", "溢利", "歸屬於母公司股東的淨溢利", "淨利潤"],
+    "F002": ["承保溢利", "承保溢利/(虧損)", "承保溢利(虧損)"],
+    "B001": ["總保費", "总保费", "保费总额"],
+    "B002": ["汽車生態總保費", "車險總保費", "汽车生态总保费", "车险总保费"],
+    "B005": [],
+    "B006": ["健康生態總保費", "健康生态总保费"],
+    "B010": ["總保費同比", "保費同比增長", "同比變動", "总保费同比", "保费同比"],
+    "B011": ["汽車生態保險服務收入", "汽车生态保险服务收入"],
+    "F009": ["汽車生態綜合成本率", "汽车生态综合成本率"],
+}
+
 # (显示名, 全称, 短称, 英文, 繁体全称, 繁体短称)
 LINES = [
     ("车险", "车险", "机动车辆保险", "motor", "車險", "機動車輛保險"),
@@ -57,6 +70,14 @@ def join(items: list[str]) -> str:
     return "|".join(item for item in items if item)
 
 
+def patch_keywords(row: list, extra: list[str]) -> None:
+    existing = [x for x in str(row[4]).split("|") if x]
+    for term in extra:
+        if term not in existing:
+            existing.append(term)
+    row[4] = "|".join(existing)
+
+
 def main() -> None:
     wb = openpyxl.load_workbook(PATH)
     ws = wb["indicator_dictionary"]
@@ -66,6 +87,9 @@ def main() -> None:
     for row in ws.iter_rows(min_row=2, values_only=True):
         if row[0] in ORIGINAL_IDS:
             original.append(list(row))
+    for row in original:
+        if row[0] in KEYWORD_PATCHES:
+            patch_keywords(row, KEYWORD_PATCHES[row[0]])
 
     new_rows: list[list] = []
 
@@ -101,10 +125,10 @@ def main() -> None:
     new_rows.append([
         "B036", "业务规模指标", "新能源车险保费收入",
         "新能源车险原保险保费收入|新能源汽车保险保费|new energy vehicle premiums",
-        join(kws + ["新能源汽车保险保费", "新能源车险原保费"]),
+        join(kws + ["新能源汽车保险保费", "新能源车险原保费", "新能源車險總保費", "新能源車險佔比", "新能源車險保費佔比", "新能源车险总保费", "新能源车险占比"]),
         "新能源车险(新能源汽车保险)业务的原保险保费收入。仅在公司披露新能源车险/新能源汽车保险数据时提取;未披露不得提取,严禁与整体车险指标混淆。",
         "百万元", "number",
-        "按年报披露的'新能源车险/新能源汽车保险'保费提取;若未单独披露该险种保费,则不提取,不得用整体车险保费代替。",
+        "按年报披露的'新能源车险/新能源汽车保险'保费提取;若未单独披露绝对金额,但披露了占车险保费比例或同比增速,则提取比例/增速并注明口径;严禁用整体车险保费代替。",
         SRC_PRIORITY,
     ])
 
