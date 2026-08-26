@@ -51,6 +51,87 @@ def normalize_text(s):
     return "".join(s.split())
 
 
+# 已知险种/生态行标签(简繁),用于修复 MinerU 表格行标签合并/丢失错位
+LINE_LABELS = [
+    "健康险", "健康保險", "健康險", "健康生态", "健康生態",
+    "汽车保险", "汽車保險", "车险", "車險", "汽车生态", "汽車生態",
+    "机动车辆保险", "機動車輛保險",
+    "责任险", "責任險", "责任保险", "責任保險",
+    "家庭财产保险", "家庭財產保險", "意外险", "意外險", "意外伤害保险", "意外傷害保險",
+    "信用保险", "信用保險", "保证险", "保證險", "保证保险", "保證保險",
+    "货运险", "貨運險", "货物运输保险", "貨物運輸保險",
+    "农险", "農險", "农业保险", "農業保險", "企财险", "企財險", "企业财产保险", "企業財產保險",
+    "其他", "退貨運費險", "總計", "合计",
+]
+
+METRIC_HINTS = [
+    "原保险保费收入", "原保險保費收入", "保险服务收入", "保險服務收入",
+    "保险服务费用", "保險服務費用", "承保利润", "承保利潤", "承保溢利",
+    "综合成本率", "綜合成本率", "综合赔付率", "綜合賠付率", "综合费用率", "綜合費用率",
+    "保费收入", "保費收入", "保费", "保費", "投资收益", "投資收益",
+]
+
+
+def _repair_table_df(df):
+    """修复 MinerU 表格行标签错位:
+    当某行标签单元格含 2+ 个险种名、且上一行无标签但有数值时,
+    把第一个险种名还给上一行,本行保留最后一个险种名。"""
+    rows = [[str(v).strip() for v in row.tolist()] for _, row in df.iterrows()]
+
+    def labels_in(cell):
+        return [lab for lab in LINE_LABELS if lab and lab in cell]
+
+    for i in range(1, len(rows)):
+        prev, cur = rows[i - 1], rows[i]
+        if not prev or not cur:
+            continue
+        if prev and cur and prev[0] in ("", "nan") and cur[0] not in ("", "nan"):
+            labs = labels_in(cur[0])
+            has_values = any(v and v not in ("nan", "") for v in prev[1:])
+            if len(labs) >= 2 and has_values:
+                prev[0] = labs[0]
+                cur[0] = labs[-1]
+    return pd.DataFrame(rows)
+
+
+def repair_table_html(html: str) -> str:
+    """修复 MinerU 表格行标签错位并重建为简单 HTML,供提取阶段直接读取。"""
+    rows = re.findall(r"<tr[^>]*>(.*?)</tr>", html, flags=re.S)
+    cells_list = []
+    for row in rows:
+        cells = re.findall(r"<t[dh][^>]*>(.*?)</t[dh]>", row, flags=re.S)
+        cells = [re.sub(r"<[^>]+>", "", c).strip() for c in cells]
+        cells_list.append(cells)
+    for i in range(1, len(cells_list)):
+        prev, cur = cells_list[i - 1], cells_list[i]
+        if not prev or not cur:
+            continue
+        if prev and cur and prev[0] in ("", "nan") and cur[0] not in ("", "nan"):
+            labs = [lab for lab in LINE_LABELS if lab and lab in cur[0]]
+            has_values = any(v and v not in ("nan", "") for v in prev[1:])
+            if len(labs) >= 2 and has_values:
+                prev[0] = labs[0]
+                cur[0] = labs[-1]
+    rebuilt = ["<table>"]
+    for cells in cells_list:
+        rebuilt.append("<tr>" + "".join(f"<td>{c}</td>" for c in cells) + "</tr>")
+    rebuilt.append("</table>")
+    return "".join(rebuilt)
+
+
+def _metric_hint(chunk):
+    """从章节标题/内容提取指标名(表头缺失时表格的指标名在章节标题里)。"""
+    head = f"{chunk.get('title') or ''} {chunk.get('section') or ''}"
+    for metric in METRIC_HINTS:
+        if metric in head:
+            return metric
+    text = (chunk.get("content") or "")[:600]
+    for metric in METRIC_HINTS:
+        if metric in text:
+            return metric
+    return ""
+
+
 def table_semantic_text(chunk):
     """
     把表格的“行标签 × 表头”组合成语义短语，解决表格结构问题：
@@ -59,6 +140,7 @@ def table_semantic_text(chunk):
     这里生成“车险保险服务收入”“车险原保险保费收入”等组合，让关键词直接命中。
     """
     parts = []
+    metric_hint = _metric_hint(chunk)
     for t in chunk.get("tables", []):
         html = t.get("content", "")
         try:
@@ -68,6 +150,7 @@ def table_semantic_text(chunk):
         if not parsed:
             continue
         df = parsed[0]
+        df = _repair_table_df(df)
         if all(str(c).isdigit() for c in df.columns):
             # read_html 未把首行识别为表头时，手动提升
             header = [str(v).strip() for v in df.iloc[0].tolist()]
@@ -92,6 +175,8 @@ def table_semantic_text(chunk):
                     continue
                 if j < len(cells):
                     parts.append(row_label + col)
+            if metric_hint:
+                parts.append(row_label + metric_hint)
     return "\n".join(parts)
 
 
@@ -122,6 +207,14 @@ RELATED_INDICATORS = {
     "非车险业务占比": ["原保险保费收入"],
     "车险保险服务收入": ["保险服务收入"],
     "非车保险服务收入": ["保险服务收入"],
+    "健康险保险服务收入": ["保险服务收入"],
+    "责任险保险服务收入": ["保险服务收入"],
+    "意外险保险服务收入": ["保险服务收入"],
+    "保证险保险服务收入": ["保险服务收入"],
+    "货运险保险服务收入": ["保险服务收入"],
+    "农险保险服务收入": ["保险服务收入"],
+    "企财险保险服务收入": ["保险服务收入"],
+    "新能源车险保险服务收入": ["保险服务收入"],
     "非车非保证险保费": ["非车险保费收入", "原保险保费收入"],
 }
 
@@ -137,8 +230,16 @@ EXPAND_REQUIRED_TERMS = {
     "健康险保费": ["健康险", "健康保险", "健康生态", "健康生態", "健康險", "健康保險"],
     "车险业务占比": ["车险", "机动车辆保险", "机动车辆险", "汽车生态", "車險", "機動車輛保險", "汽車生態"],
     "非车险业务占比": ["非车险", "非机动车辆保险", "非机动车辆险", "非車險", "非機動車輛保險"],
-    "车险保险服务收入": ["车险", "机动车辆保险", "机动车辆险", "汽车生态", "車險", "機動車輛保險", "汽車生態", "汽车保险"],
+    "车险保险服务收入": ["车险", "机动车辆保险", "机动车辆险", "汽车生态", "汽车保险", "車險", "機動車輛保險", "汽車生態", "汽車保險"],
     "非车保险服务收入": ["非车险", "非机动车辆保险", "非机动车辆险", "非車險", "非機動車輛保險"],
+    "健康险保险服务收入": ["健康险", "健康保险", "健康生态", "健康險", "健康保險", "健康生態"],
+    "责任险保险服务收入": ["责任险", "责任保险", "責任險", "責任保險"],
+    "意外险保险服务收入": ["意外险", "意外伤害保险", "意外險", "意外傷害保險"],
+    "保证险保险服务收入": ["保证险", "保证保险", "保證險", "保證保險"],
+    "货运险保险服务收入": ["货运险", "货物运输保险", "貨運險", "貨物運輸保險"],
+    "农险保险服务收入": ["农险", "农业保险", "農險", "農業保險"],
+    "企财险保险服务收入": ["企财险", "企业财产保险", "企財險", "企業財產保險"],
+    "新能源车险保险服务收入": ["新能源车险", "新能源汽车保险", "新能源車險", "新能源汽車保險"],
     "非车非保证险保费": [
         "非车非保证", "剔除保证保险", "不含保证保险", "扣除保证保险", "排除保证保险",
         "非車非保證", "剔除保證保險", "不含保證保險", "扣除保證保險", "排除保證保險",
@@ -152,6 +253,20 @@ def _contains_any(item: dict, terms: list[str]) -> bool:
         parts.append(re.sub(r"<[^>]+>", " ", str(table.get("content") or "")))
     text = " ".join(parts)
     return any(term in text for term in terms)
+
+
+def _candidate_allowed(indicator_name: str, title, section) -> bool:
+    """保费类与保险服务收入类候选硬隔离,防止把服务收入当保费提取(或反之)。"""
+    head = f"{title or ''} {section or ''}"
+    name = indicator_name or ""
+    if "保费" in name and ("保险服务收入" in head or "保險服務收入" in head):
+        return False
+    if "保险服务收入" in name:
+        if ("保费" in head or "保費" in head) and not (
+            "保险服务收入" in head or "保險服務收入" in head
+        ):
+            return False
+    return True
 
 
 def keyword_matches(keyword, text, ntext):
@@ -230,6 +345,13 @@ for indicator in indicators:
 
             if keyword_matches(keyword, text, ntext):
 
+                if not _candidate_allowed(
+                    indicator_name,
+                    chunk.get("title"),
+                    chunk.get("section"),
+                ):
+                    continue
+
                 results.append({
 
                     "indicator_name":
@@ -259,8 +381,15 @@ for indicator in indicators:
                     "content":
                     chunk["content"],
 
-                    "tables":
-                    chunk.get("tables", [])
+                "tables":
+                    [
+                        {
+                            **t,
+                            "content": repair_table_html(t["content"])
+                            if t.get("content") else t.get("content"),
+                        }
+                        for t in (chunk.get("tables") or [])
+                    ]
 
                 })
 
@@ -287,6 +416,8 @@ for target, related in RELATED_INDICATORS.items():
 
             if item["chunk_id"] not in existing_ids:
                 if required_terms and not _contains_any(item, required_terms):
+                    continue
+                if not _candidate_allowed(target, item.get("title"), item.get("section")):
                     continue
 
                 new_item = dict(item)
