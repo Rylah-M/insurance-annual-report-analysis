@@ -337,6 +337,31 @@ select {
   color: #475467;
 }
 
+.chip-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid #d0d7e2;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #475467;
+  padding: 6px 12px;
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.chip-check input {
+  accent-color: #1f6feb;
+  margin: 0;
+}
+
+.stack-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
 .muted {
   color: #667085;
 }

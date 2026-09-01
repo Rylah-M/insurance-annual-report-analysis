@@ -576,6 +576,40 @@ def report_artifacts(company: str | None = Query(None)) -> dict[str, Any]:
     }
 
 
+@router.post("/standardexcel/generate")
+def generate_standardexcel(payload: dict[str, Any] = Body(...)) -> Response:
+    companies = payload.get("companies") or []
+    years = payload.get("years") or []
+    if not companies:
+        raise HTTPException(status_code=400, detail="请至少选择一家公司")
+    if not years:
+        raise HTTPException(status_code=400, detail="请至少选择一个年份")
+
+    try:
+        years_int = sorted({int(year) for year in years})
+    except (TypeError, ValueError):
+        raise HTTPException(status_code=400, detail="年份格式不正确")
+
+    df = load_database()
+    valid_companies = set(df["company"].dropna().unique())
+    unknown = [company for company in companies if company not in valid_companies]
+    if unknown:
+        raise HTTPException(status_code=404, detail=f"公司不存在: {', '.join(unknown)}")
+
+    from services.standardexcel_service import generate_standardexcel_bytes
+
+    try:
+        content = generate_standardexcel_bytes(companies, years_int)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"standardexcel 生成失败: {exc}")
+
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": 'attachment; filename="standardexcel.xlsx"'},
+    )
+
+
 @router.post("/chat")
 def chat(
     payload: dict[str, Any] = Body(...),

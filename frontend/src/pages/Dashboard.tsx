@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Download, FilterX, Search } from "lucide-react";
+import { Download, FileSpreadsheet, FilterX, Loader2, Search } from "lucide-react";
 import { api, Metadata } from "../api/request";
 import { DataCard } from "../components/Card";
 
@@ -18,6 +18,12 @@ export function Dashboard({
   const [periodFilter, setPeriodFilter] = useState("");
   const [indicatorFilter, setIndicatorFilter] = useState("");
   const [fileName, setFileName] = useState("database_overview.csv");
+  const [selectedCompanies, setSelectedCompanies] = useState<string[]>([]);
+  const [selectedYears, setSelectedYears] = useState<number[]>([]);
+  const [generating, setGenerating] = useState(false);
+  const [excelDownloadUrl, setExcelDownloadUrl] = useState<string | null>(null);
+  const [excelError, setExcelError] = useState<string | null>(null);
+  const [excelFileName, setExcelFileName] = useState("standardexcel");
 
   useEffect(() => {
     if (active) {
@@ -73,6 +79,36 @@ export function Dashboard({
     setPeriodFilter("");
     setIndicatorFilter("");
   };
+
+  const toggleCompany = (company: string) =>
+    setSelectedCompanies((prev) =>
+      prev.includes(company) ? prev.filter((item) => item !== company) : [...prev, company]
+    );
+
+  const toggleYear = (year: number) =>
+    setSelectedYears((prev) =>
+      prev.includes(year) ? prev.filter((item) => item !== year) : [...prev, year]
+    );
+
+  const generateExcel = () => {
+    if (!selectedCompanies.length || !selectedYears.length) {
+      setExcelError("请至少选择一家公司和一年");
+      return;
+    }
+    setGenerating(true);
+    setExcelError(null);
+    setExcelDownloadUrl(null);
+    api
+      .generateStandardexcel(selectedCompanies, selectedYears)
+      .then((blob) => setExcelDownloadUrl(URL.createObjectURL(blob)))
+      .catch((err) => setExcelError(err?.message || "生成失败"))
+      .finally(() => setGenerating(false));
+  };
+
+  const excelDownloadName = (() => {
+    const trimmed = excelFileName.trim() || "standardexcel";
+    return trimmed.toLowerCase().endsWith(".xlsx") ? trimmed : `${trimmed}.xlsx`;
+  })();
 
   const downloadUrl = useMemo(
     () =>
@@ -175,6 +211,64 @@ export function Dashboard({
               <span key={indicator}>{indicator}</span>
             ))}
           </div>
+        </section>
+
+        <section className="panel">
+          <h2>横向对标底稿（standardexcel）</h2>
+          <div className="stack-fields">
+            <div>
+              <strong>公司（可多选）</strong>
+              <div className="field-cloud">
+                {(metadata?.companies ?? []).map((company) => (
+                  <label key={company} className="chip-check">
+                    <input
+                      type="checkbox"
+                      checked={selectedCompanies.includes(company)}
+                      onChange={() => toggleCompany(company)}
+                    />
+                    {company}
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div>
+              <strong>年份（可多选）</strong>
+              <div className="field-cloud">
+                {(metadata?.years ?? []).map((year) => (
+                  <label key={year} className="chip-check">
+                    <input
+                      type="checkbox"
+                      checked={selectedYears.includes(year)}
+                      onChange={() => toggleYear(year)}
+                    />
+                    {year}
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="db-download-row" style={{ margin: "12px 0 0", marginLeft: 0 }}>
+            <label>
+              下载文件名
+              <input
+                value={excelFileName}
+                onChange={(event) => setExcelFileName(event.target.value)}
+                placeholder="standardexcel"
+              />
+            </label>
+          </div>
+          <div className="quick-actions" style={{ marginTop: 12 }}>
+            <button className="primary-action" onClick={generateExcel} disabled={generating}>
+              {generating ? <Loader2 className="spin" size={16} /> : <FileSpreadsheet size={16} />}
+              {generating ? "生成中" : "生成 Excel"}
+            </button>
+            {excelDownloadUrl && (
+              <a className="ghost-action" href={excelDownloadUrl} download={excelDownloadName}>
+                <Download size={16} /> 下载 Excel
+              </a>
+            )}
+          </div>
+          {excelError && <div className="error-banner">{excelError}</div>}
         </section>
       </div>
 

@@ -392,6 +392,24 @@ export type LlmTestResult = {
 export const api = {
   metadata: () => request<Metadata>("/api/metadata"),
   records: () => request<Array<Record<string, unknown>>>("/api/records"),
+  generateStandardexcel: async (companies: string[], years: number[]) => {
+    const response = await fetch(`${API_BASE}/api/standardexcel/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ companies, years })
+    });
+    if (!response.ok) {
+      let detail = `API 请求失败: ${response.status}`;
+      try {
+        const data = await response.json();
+        if (data && typeof data.detail === "string") detail = data.detail;
+      } catch {
+        // 非 JSON 响应时保留默认错误信息
+      }
+      throw new Error(detail);
+    }
+    return response.blob();
+  },
   databaseDownload: (params?: {
     company?: string;
     year?: string;
