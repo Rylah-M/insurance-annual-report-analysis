@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import {
   api,
+  DictionaryIndicator,
   ExtractionResult,
   ReportTask,
   ReportTaskStatus,
@@ -54,6 +55,19 @@ export function UploadReport() {
     checked: boolean;
     parsed: boolean;
   } | null>(null);
+  const [dictionary, setDictionary] = useState<DictionaryIndicator[]>([]);
+  const [draft, setDraft] = useState({
+    indicatorId: "",
+    indicatorName: "",
+    value: "",
+    unit: "",
+    scope: "",
+    reviewStatus: "待审核"
+  });
+  const [draftChecked, setDraftChecked] = useState(false);
+  const [draftError, setDraftError] = useState("");
+  const [draftSearch, setDraftSearch] = useState("");
+  const [draftOpen, setDraftOpen] = useState(false);
   const timerRef = useRef<number | null>(null);
 
   const stopPolling = () => {
@@ -76,6 +90,13 @@ export function UploadReport() {
 
   useEffect(() => {
     refreshTasks();
+  }, []);
+
+  useEffect(() => {
+    api
+      .indicatorDictionary()
+      .then((items) => setDictionary(items))
+      .catch(() => undefined);
   }, []);
 
   // 选完公司/年份/报告期/市场后，检查该年报是否已解析过
@@ -265,6 +286,65 @@ export function UploadReport() {
     setEditedRows((current) =>
       current.map((row, i) => (i === index ? { ...row, [field]: value } : row))
     );
+  };
+
+  const filteredDictionary = dictionary.filter(
+    (item) =>
+      item.indicator_name.includes(draftSearch.trim()) ||
+      item.indicator_id.toLowerCase().includes(draftSearch.trim().toLowerCase())
+  );
+
+  const addManualIndicator = () => {
+    setDraftError("");
+    if (!draft.indicatorId || !draft.indicatorName) {
+      setDraftError("请先选择指标名称");
+      setDraftChecked(false);
+      return;
+    }
+    if (!draft.value.trim()) {
+      setDraftError("请填写指标数值");
+      setDraftChecked(false);
+      return;
+    }
+    const baseRows = editedRows.length ? editedRows : (result?.rows ?? []);
+    const duplicate = baseRows.some(
+      (row) => String(row.indicator_name) === draft.indicatorName
+    );
+    if (duplicate) {
+      setDraftError(`该指标「${draft.indicatorName}」已在清单中`);
+      setDraftChecked(false);
+      return;
+    }
+    const base: Record<string, unknown> = result?.rows?.[0] ?? {};
+    const newRow: Record<string, unknown> = {
+      company: String(base.company ?? ""),
+      year: String(base.year ?? ""),
+      quarter: String(base.quarter ?? ""),
+      market: String(base.market ?? ""),
+      indicator_id: draft.indicatorId,
+      indicator_name: draft.indicatorName,
+      indicator_value: draft.value.trim(),
+      unit: draft.unit.trim(),
+      business_scope: draft.scope.trim(),
+      source_text: "人工核对补充",
+      confidence_score: "100",
+      review_status: draft.reviewStatus
+    };
+    setEditedRows((current) => [
+      ...(current.length ? current : (result?.rows ?? [])),
+      newRow
+    ]);
+    setDraftChecked(false);
+    setDraft({
+      indicatorId: "",
+      indicatorName: "",
+      value: "",
+      unit: "",
+      scope: "",
+      reviewStatus: "待审核"
+    });
+    setDraftSearch("");
+    setDraftOpen(false);
   };
 
   const handleSaveEdits = async () => {
@@ -485,6 +565,7 @@ export function UploadReport() {
               <table className="compare-table">
                 <thead>
                   <tr>
+                    <th></th>
                     <th>指标</th>
                     <th>数值</th>
                     <th>单位</th>
@@ -496,6 +577,7 @@ export function UploadReport() {
                 <tbody>
                   {rows.map((row, index) => (
                     <tr key={`${row.indicator_id}-${index}`}>
+                      <td></td>
                       <td>
                         <strong>{String(row.indicator_name)}</strong>
                         <small className="table-sub">{String(row.indicator_id)}</small>
@@ -557,8 +639,124 @@ export function UploadReport() {
                       </td>
                     </tr>
                   ))}
+                  <tr className="draft-add-row">
+                    <td>
+                      <input
+                        type="checkbox"
+                        title="勾选后加入清单"
+                        checked={draftChecked}
+                        onChange={(event) => {
+                          setDraftChecked(event.target.checked);
+                          if (event.target.checked) {
+                            addManualIndicator();
+                          }
+                        }}
+                      />
+                    </td>
+                    <td>
+                      <div className="search-select">
+                        <input
+                          className="table-input"
+                          placeholder="搜索/选择指标..."
+                          value={draftOpen ? draftSearch : draft.indicatorName}
+                          onChange={(event) => {
+                            setDraftSearch(event.target.value);
+                            setDraftOpen(true);
+                          }}
+                          onFocus={() => setDraftOpen(true)}
+                          onBlur={() => {
+                            setTimeout(() => setDraftOpen(false), 150);
+                          }}
+                        />
+                        {draftOpen && (
+                          <ul className="search-select-list">
+                            {filteredDictionary.map((item) => (
+                              <li
+                                key={item.indicator_id}
+                                onMouseDown={() => {
+                                  setDraft((current) => ({
+                                    ...current,
+                                    indicatorId: item.indicator_id,
+                                    indicatorName: item.indicator_name
+                                  }));
+                                  setDraftSearch("");
+                                  setDraftOpen(false);
+                                }}
+                              >
+                                <strong>{item.indicator_name}</strong>
+                                <small>{item.indicator_id}</small>
+                              </li>
+                            ))}
+                            {filteredDictionary.length === 0 && (
+                              <li className="empty">无匹配指标</li>
+                            )}
+                          </ul>
+                        )}
+                      </div>
+                    </td>
+                    <td>
+                      <input
+                        className="table-input"
+                        placeholder="数值"
+                        value={draft.value}
+                        onChange={(event) =>
+                          setDraft((current) => ({
+                            ...current,
+                            value: event.target.value
+                          }))
+                        }
+                      />
+                    </td>
+                    <td>
+                      <input
+                        className="table-input"
+                        placeholder="单位"
+                        value={draft.unit}
+                        onChange={(event) =>
+                          setDraft((current) => ({
+                            ...current,
+                            unit: event.target.value
+                          }))
+                        }
+                      />
+                    </td>
+                    <td>
+                      <input
+                        className="table-input"
+                        placeholder="业务范围"
+                        value={draft.scope}
+                        onChange={(event) =>
+                          setDraft((current) => ({
+                            ...current,
+                            scope: event.target.value
+                          }))
+                        }
+                      />
+                    </td>
+                    <td>
+                      <select
+                        className="table-input"
+                        value={draft.reviewStatus}
+                        onChange={(event) =>
+                          setDraft((current) => ({
+                            ...current,
+                            reviewStatus: event.target.value
+                          }))
+                        }
+                      >
+                        <option value="待审核">待审核</option>
+                        <option value="已审核">已审核</option>
+                        <option value="需修改">需修改</option>
+                        <option value="不采用">不采用</option>
+                      </select>
+                    </td>
+                  </tr>
                 </tbody>
               </table>
+              {draftError && <p className="draft-error">{draftError}</p>}
+              <p className="form-hint">
+                核对发现缺失指标时,在最后一行选择/填写指标信息,勾选左侧复选框加入清单,随整批结果一起写入数据库。
+              </p>
             </div>
           ) : (
             <p className="placeholder">本次未提取到指标结果。</p>

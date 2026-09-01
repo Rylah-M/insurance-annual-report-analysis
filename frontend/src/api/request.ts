@@ -46,6 +46,15 @@ export type Indicator = {
   unit: string;
 };
 
+export type DictionaryIndicator = {
+  indicator_id: string;
+  indicator_category?: string;
+  indicator_name: string;
+  alias?: string;
+  unit?: string;
+  definition?: string;
+};
+
 export type IndicatorValue = {
   company: string;
   indicator: string;
@@ -403,6 +412,8 @@ export const api = {
   years: () => request<number[]>("/api/years"),
   quarters: () => request<string[]>("/api/quarters"),
   indicators: () => request<Indicator[]>("/indicators"),
+  indicatorDictionary: () =>
+    request<DictionaryIndicator[]>("/api/indicators/dictionary"),
   companyPeriodData: (company: string, year: number, quarter?: string) => {
     const params = new URLSearchParams({ company, year: String(year) });
     if (quarter) params.set("quarter", quarter);

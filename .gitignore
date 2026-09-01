@@ -32,3 +32,4 @@ agents/**/output/
 agents/**/chunk/
 agents/**/__pycache__/
 output_chunks_v2/
+data/logs/

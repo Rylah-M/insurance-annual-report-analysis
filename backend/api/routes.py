@@ -346,6 +346,25 @@ def indicators() -> list[dict]:
     return _indicator_rows(load_database())
 
 
+@router.get("/indicators/dictionary")
+def indicator_dictionary() -> list[dict[str, Any]]:
+    """返回指标字典,供核对环节手动添加指标时下拉选择(保证名称/ID 一致)。"""
+    path = (
+        Path(__file__).resolve().parents[2]
+        / "agents"
+        / "zd-agent0811"
+        / "output"
+        / "indicator_dictionary.json"
+    )
+    if not path.exists():
+        return []
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        return []
+    return data if isinstance(data, list) else []
+
+
 @router.get("/analysis/comparison")
 def comparison(
     indicator: str = Query(..., description="指标名称"),
@@ -691,9 +710,14 @@ def test_llm_settings(payload: dict[str, Any] = Body(...)) -> dict[str, Any]:
 
     api_key = (payload.get("api_key") or "").strip()
     base_url = (payload.get("base_url") or "").strip()
+    settings = load_settings()
+    if not api_key and is_current_owner(settings):
+        api_key = (settings.get("api_key") or "").strip()
+    if not base_url:
+        base_url = settings.get("base_url") or DEFAULT_BASE_URL
     if not api_key:
         raise HTTPException(status_code=400, detail="API Key 不能为空")
-    client = OpenAI(api_key=api_key, base_url=base_url or DEFAULT_BASE_URL)
+    client = OpenAI(api_key=api_key, base_url=base_url)
     try:
         response = client.chat.completions.create(
             model="deepseek-chat",
