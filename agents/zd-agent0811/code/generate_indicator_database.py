@@ -208,7 +208,10 @@ def build_database_rows(extracted_results, chunks):
                 "business_scope_type": classify_business_scope_type(
                     item.get("business_scope_type", item.get("business_scope", ""))
                 ),
-                "business_type": infer_business_type(indicator_name),
+                "business_type": (
+                    str(item.get("business_type") or "").strip()
+                    or infer_business_type(indicator_name)
+                ),
                 "source_file": source_file,
                 "source_page": source_page,
                 "source_chunk_id": source_chunk_id,
@@ -231,6 +234,8 @@ def dedupe_key(row):
         str(row.get("report_period", "")),
         str(row.get("indicator_id", "")),
         str(row.get("indicator_name", "")),
+        str(row.get("business_scope", "")),
+        str(row.get("business_type", "")),
     )
 
 

@@ -225,8 +225,9 @@ source_priority:
 {candidate_text}
 
 
-请严格返回JSON：
+请严格返回JSON数组：
 
+[
 {{
 "company":"",
 "year":"",
@@ -235,13 +236,21 @@ source_priority:
 "indicator_value":"",
 "unit":"",
 "business_scope":"",
+"business_scope_type":"",
+"business_type":"",
 "source_text":"",
 "confidence_score":""
 }}
+]
 
 
 要求：
 
+- 返回一个JSON数组（每个元素是一条指标记录）；不存在分险种表格时，数组只包含1条记录；
+- 若候选表格以"业务险种/险种/险类"作为行标签（如 车险、意外伤害及健康保险、责任保险、农业保险、企业财产保险等），
+  且本指标是表格的列标题之一，则必须对该表格中的每一行险种分别输出一条记录：
+  business_type 与 business_scope 填该行险种名称（如"车险""责任保险"），business_scope_type 填"财险口径"；
+- 分险种逐行提取时，跳过"合计/总计/全险种/整体"等汇总行；每行数值必须取自对应行，禁止只取第一行或重复同一数值；
 - indicator_value只填写数字；
 - indicator_value必须按standard_unit单位填写：原文为亿元时换算为百万元（1亿元=100百万元），为万亿元时换算为百万元（1万亿元=1,000,000百万元）；
 - 金额换算时保留原始精度（千元→百万元除以1000保留3位小数），不要四舍五入成整数；例如16,557,777千元=16,557.777百万元；
