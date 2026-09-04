@@ -28,6 +28,26 @@ KEYWORD_PATCHES = {
     "F009": ["汽車生態綜合成本率", "汽车生态综合成本率"],
 }
 
+# 针对既有行的关键词剔除:
+# - 去掉会把"意外伤害及健康保险(意健险)"合并披露误匹配到单独"意外险/健康险"的合并词;
+# - 健康险去掉寿险口径的"长期/短期健康险"词。
+KEYWORD_REMOVE = {
+    "B006": [
+        "健康险", "健康保險", "健康險", "健康保险",
+        "意外伤害及健康保险", "意外伤害及健康险", "意外伤害和健康保险", "意外健康险",
+        "意外险及健康险", "意健险",
+        "意外傷害及健康保險", "意外傷害及健康險", "意外健康險", "意外險及健康險", "意健險",
+        "长期健康险", "长期健康保险", "短期健康险", "短期健康保险",
+        "長期健康險", "長期健康保險", "短期健康險", "短期健康保險",
+    ],
+    "B014": [
+        "意外险", "意外险业务", "意外伤害险", "意外伤害", "意外傷害", "意外險",
+        "意外伤害及健康保险", "意外伤害及健康险", "意外伤害和健康保险", "意外健康险",
+        "意外险及健康险", "意健险",
+        "意外傷害及健康保險", "意外傷害及健康險", "意外健康險", "意外險及健康險", "意健險",
+    ],
+}
+
 # (显示名, 全称, 短称, 英文, 繁体全称, 繁体短称)
 LINES = [
     ("车险", "车险", "机动车辆保险", "motor", "車險", "機動車輛保險"),
@@ -78,6 +98,11 @@ def patch_keywords(row: list, extra: list[str]) -> None:
     row[4] = "|".join(existing)
 
 
+def remove_keywords(row: list, drop: list[str]) -> None:
+    existing = [x for x in str(row[4]).split("|") if x]
+    row[4] = "|".join(x for x in existing if x not in drop)
+
+
 def main() -> None:
     wb = openpyxl.load_workbook(PATH)
     ws = wb["indicator_dictionary"]
@@ -90,6 +115,8 @@ def main() -> None:
     for row in original:
         if row[0] in KEYWORD_PATCHES:
             patch_keywords(row, KEYWORD_PATCHES[row[0]])
+        if row[0] in KEYWORD_REMOVE:
+            remove_keywords(row, KEYWORD_REMOVE[row[0]])
 
     new_rows: list[list] = []
 
@@ -131,6 +158,51 @@ def main() -> None:
         "按年报披露的'新能源车险/新能源汽车保险'保费提取;若未单独披露绝对金额,但披露了占车险保费比例或同比增速,则提取比例/增速并注明口径;严禁用整体车险保费代替。",
         SRC_PRIORITY,
     ])
+
+    # ---- 意健险(意外伤害及健康保险)合并口径 B037-B039 ----
+    yj_full, yj_short, yj_en, yj_tf, yj_ts = (
+        "意外伤害及健康保险", "意健险", "accident & health",
+        "意外傷害及健康保險", "意健險",
+    )
+    yj_note = (
+        "仅当年报将意外伤害保险与健康保险按'意外伤害及健康保险/意健险'合并口径披露时提取;"
+        "若两者分别披露,请分别提取到'意外险''健康险'指标下,本合并指标留空。"
+    )
+    for bidx, metric, metric_tw, en_metric, name_suffix in [
+        (37, "保费", "保費", "premiums", "保费收入"),
+        (38, "保险服务收入", "保險服務收入", "insurance service revenue", "保险服务收入"),
+        (39, "保险服务费用", "保險服務費用", "insurance service expenses", "保险服务费用"),
+    ]:
+        kws = kw_metric(yj_full, yj_short, yj_en, yj_tf, yj_ts, metric, metric_tw, en_metric)
+        new_rows.append([
+            f"B{bidx:03d}", "业务规模指标", f"意健险{name_suffix}",
+            f"{yj_full}{metric}|{yj_short}{metric}|{yj_en} {en_metric}",
+            join(kws + [f"{yj_tf}{metric_tw}", f"{yj_ts}{metric_tw}"]),
+            f"{yj_full}(意健险)业务合并披露口径的{metric}。{yj_note}",
+            "百万元", "number",
+            f"按'意外伤害及健康保险/意健险'合并口径提取;若分别披露意外伤害保险与健康保险,本指标留空。",
+            SRC_PRIORITY,
+        ])
+
+    # ---- 意健险承保利润 F029 / 综合成本率 F030 ----
+    for fmetric, category, fname, unit, dtype in [
+        ("承保利润", "盈利能力指标", "意健险承保利润", "百万元", "number"),
+        ("综合成本率", "承保质量指标", "意健险综合成本率", "%", "percentage"),
+    ]:
+        kws = kw_metric(
+            yj_full, yj_short, yj_en, yj_tf, yj_ts,
+            fmetric, "承保利潤" if "承保" in fmetric else "綜合成本率",
+            "underwriting profit" if "承保" in fmetric else "combined ratio",
+        )
+        new_rows.append([
+            f"F{29 if fmetric == '承保利润' else 30:03d}", category, fname,
+            f"{yj_full}{fmetric}|{yj_short}{fmetric}|{yj_short}COR" if "成本" in fmetric else f"{yj_full}{fmetric}|{yj_short}{fmetric}",
+            join(kws),
+            f"{yj_full}(意健险)业务合并披露口径的{fmetric}。{yj_note}",
+            unit, dtype,
+            f"按'意外伤害及健康保险/意健险'合并口径提取;若分别披露意外伤害保险与健康保险,本指标留空。",
+            SRC_PRIORITY,
+        ])
 
     # ---- 承保利润 (盈利能力指标) F011-F020 ----
     for idx, (display, full, short, en, tf, ts) in enumerate(LINES, start=11):

@@ -248,11 +248,60 @@ EXPAND_REQUIRED_TERMS = {
 
 
 def _contains_any(item: dict, terms: list[str]) -> bool:
+    text = _item_text(item)
+    return any(term in text for term in terms)
+
+
+def _item_text(item: dict) -> str:
     parts = [str(item.get("content") or "")]
     for table in item.get("tables") or []:
         parts.append(re.sub(r"<[^>]+>", " ", str(table.get("content") or "")))
-    text = " ".join(parts)
-    return any(term in text for term in terms)
+    return " ".join(parts)
+
+
+# 意健险(意外伤害及健康保险)合并披露标记
+YJ_COMBINED_MARKERS = [
+    "意外伤害及健康保险", "意外伤害及健康险", "意外伤害和健康保险",
+    "意外险与健康险", "意健险", "意外伤害及", "意外傷害及",
+    "意外傷害及健康保險", "意外傷害及健康險", "意外險與健康險", "意健險",
+]
+
+
+def _is_yj_indicator(name: str) -> bool:
+    return ("意健" in name) or ("意外伤害及健康" in name) or ("意外傷害及健康" in name)
+
+
+def _exclude_yj_conflict(indicator_name: str, text: str) -> bool:
+    """互斥规则:年报按'意外伤害及健康保险/意健险'合并披露时,
+    意外险/健康险的单独指标不应再命中合并值(避免两处重复提取同一数值)。
+    合并披露表格只有合并行;分开披露时表格会另有'意外伤害保险'独立行。"""
+    if _is_yj_indicator(indicator_name):
+        return False
+    ntext = normalize_text(text)
+    has_combined = any(marker in ntext for marker in YJ_COMBINED_MARKERS)
+    if not has_combined:
+        return False
+    has_sep_accident = ("意外伤害保险" in ntext) or ("意外傷害保險" in ntext)
+    return not has_sep_accident
+
+
+def _exclude_life_health_segment(indicator_name: str, text: str) -> bool:
+    """健康险单独指标排除'寿险及健康险业务'段位噪音(平安等综合集团报告)。"""
+    name = indicator_name or ""
+    if not ("健康险" in name or "健康保险" in name):
+        return False
+    ntext = normalize_text(text)
+    has_life_marker = any(
+        marker in ntext
+        for marker in ["寿险及健康险业务", "壽險及健康險業務", "寿险及健康险", "壽險及健康險"]
+    )
+    if not has_life_marker:
+        return False
+    has_pc_marker = any(
+        marker in ntext
+        for marker in ["产险", "财险", "财产保险", "產險", "財險", "財產保險"]
+    )
+    return not has_pc_marker
 
 
 def _candidate_allowed(indicator_name: str, title, section) -> bool:
@@ -351,6 +400,10 @@ for indicator in indicators:
                     chunk.get("section"),
                 ):
                     continue
+                if _exclude_yj_conflict(indicator_name, text):
+                    continue
+                if _exclude_life_health_segment(indicator_name, text):
+                    continue
 
                 results.append({
 
@@ -418,6 +471,10 @@ for target, related in RELATED_INDICATORS.items():
                 if required_terms and not _contains_any(item, required_terms):
                     continue
                 if not _candidate_allowed(target, item.get("title"), item.get("section")):
+                    continue
+                if _exclude_yj_conflict(target, _item_text(item)):
+                    continue
+                if _exclude_life_health_segment(target, _item_text(item)):
                     continue
 
                 new_item = dict(item)
