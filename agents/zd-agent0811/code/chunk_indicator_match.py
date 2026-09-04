@@ -55,11 +55,13 @@ def normalize_text(s):
 LINE_LABELS = [
     "健康险", "健康保險", "健康險", "健康生态", "健康生態",
     "汽车保险", "汽車保險", "车险", "車險", "汽车生态", "汽車生態",
-    "机动车辆保险", "機動車輛保險",
-    "责任险", "責任險", "责任保险", "責任保險",
+    "机动车辆保险", "機動車輛保險", "机动车辆险", "機動車輛險",
+    "责任险", "責任險", "责任保险", "責任保險", "责任", "責任",
     "家庭财产保险", "家庭財產保險", "意外险", "意外險", "意外伤害保险", "意外傷害保險",
     "信用保险", "信用保險", "保证险", "保證險", "保证保险", "保證保險",
-    "货运险", "貨運險", "货物运输保险", "貨物運輸保險",
+    "货运险", "貨運險", "货物运输保险", "貨物運輸保險", "货物运输险", "貨物運輸險",
+    "意外伤害和短期健康险", "意外傷害和短期健康險", "意外及短期健康险", "意外及短期健康險",
+    "意外伤害及健康保险", "意外傷害及健康保險", "意健险", "意健險",
     "农险", "農險", "农业保险", "農業保險", "企财险", "企財險", "企业财产保险", "企業財產保險",
     "其他", "退貨運費險", "總計", "合计",
 ]
@@ -70,6 +72,39 @@ METRIC_HINTS = [
     "综合成本率", "綜合成本率", "综合赔付率", "綜合賠付率", "综合费用率", "綜合費用率",
     "保费收入", "保費收入", "保费", "保費", "投资收益", "投資收益",
 ]
+
+# 多行/跨列表头时,按表头区出现的指标碎片生成"行标签+指标"短语
+_METRIC_FRAGMENTS = {
+    "premium": ["原保險保費收入", "保費收入", "原保险保费收入", "保费收入"],
+    "revenue": ["保險服務收入", "保险服务收入", "服務收入", "服务收入"],
+    "expense": ["保險服務費用", "保险服务费用", "服務費用", "服务费用"],
+    "profit": ["承保利潤", "承保利润"],
+    "cor": ["承保綜合成本率", "綜合成本率", "综合成本率", "成本率"],
+}
+_CANONICAL_PHRASES = {
+    "premium": ["保費收入", "保费收入", "原保險保費收入", "原保险保费收入"],
+    "revenue": ["保險服務收入", "保险服务收入"],
+    "expense": ["保險服務費用", "保险服务费用"],
+    "profit": ["承保利潤", "承保利润"],
+    "cor": ["綜合成本率", "综合成本率"],
+}
+
+
+def _detected_metrics(df) -> list[str]:
+    head_rows = df.iloc[: min(4, len(df))]
+    head_text = normalize_text(
+        " ".join(
+            str(value)
+            for row in head_rows.values
+            for value in row
+            if str(value) != "nan"
+        )
+    )
+    return [
+        metric
+        for metric, patterns in _METRIC_FRAGMENTS.items()
+        if any(pattern in head_text for pattern in patterns)
+    ]
 
 
 def _repair_table_df(df):
@@ -177,6 +212,19 @@ def table_semantic_text(chunk):
                     parts.append(row_label + col)
             if metric_hint:
                 parts.append(row_label + metric_hint)
+        # 多行/跨列表头的碎片补全:表头区出现过的指标,按每个险种行补出短语
+        detected = _detected_metrics(df)
+        if detected:
+            for _, row in df.iterrows():
+                cells = [str(v).strip() for v in row.tolist()]
+                row_label = cells[0] if cells else ""
+                if not row_label or row_label in ("nan", ""):
+                    continue
+                if not any(label in row_label for label in LINE_LABELS):
+                    continue
+                for metric in detected:
+                    for phrase in _CANONICAL_PHRASES[metric]:
+                        parts.append(row_label + phrase)
     return "\n".join(parts)
 
 
@@ -264,11 +312,21 @@ YJ_COMBINED_MARKERS = [
     "意外伤害及健康保险", "意外伤害及健康险", "意外伤害和健康保险",
     "意外险与健康险", "意健险", "意外伤害及", "意外傷害及",
     "意外傷害及健康保險", "意外傷害及健康險", "意外險與健康險", "意健險",
+    "意外伤害和短期健康险", "意外傷害和短期健康險",
+    "意外及短期健康险", "意外及短期健康險",
 ]
 
 
 def _is_yj_indicator(name: str) -> bool:
-    return ("意健" in name) or ("意外伤害及健康" in name) or ("意外傷害及健康" in name)
+    return (
+        ("意健" in name)
+        or ("意外伤害及健康" in name)
+        or ("意外傷害及健康" in name)
+        or ("意外伤害和短期健康" in name)
+        or ("意外傷害和短期健康" in name)
+        or ("意外及短期健康" in name)
+        or ("意外及短期健康" in name)
+    )
 
 
 def _exclude_yj_conflict(indicator_name: str, text: str) -> bool:
@@ -276,6 +334,9 @@ def _exclude_yj_conflict(indicator_name: str, text: str) -> bool:
     意外险/健康险的单独指标不应再命中合并值(避免两处重复提取同一数值)。
     合并披露表格只有合并行;分开披露时表格会另有'意外伤害保险'独立行。"""
     if _is_yj_indicator(indicator_name):
+        return False
+    # 只对意外险/健康险类单独指标生效,不影响车险/农险等其他险种
+    if not ("意外" in indicator_name or "健康" in indicator_name):
         return False
     ntext = normalize_text(text)
     has_combined = any(marker in ntext for marker in YJ_COMBINED_MARKERS)

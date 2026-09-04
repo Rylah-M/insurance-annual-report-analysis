@@ -20,12 +20,28 @@ KEYWORD_PATCHES = {
     "F001": ["淨溢利", "溢利", "歸屬於母公司股東的淨溢利", "淨利潤"],
     "F002": ["承保溢利", "承保溢利/(虧損)", "承保溢利(虧損)"],
     "B001": ["總保費", "总保费", "保费总额"],
-    "B002": ["汽車生態總保費", "車險總保費", "汽车生态总保费", "车险总保费"],
+    "B002": [
+        "汽車生態總保費", "車險總保費", "汽车生态总保费", "车险总保费",
+        "機動車輛險保費收入", "機動車輛保險保費收入",
+        "機動車輛險原保險保費收入", "機動車輛保險原保險保費收入",
+        "機動車輛險原保費收入", "機動車輛保險原保費收入",
+    ],
     "B005": [],
     "B006": ["健康生態總保費", "健康生态总保费"],
     "B010": ["總保費同比", "保費同比增長", "同比變動", "总保费同比", "保费同比"],
-    "B011": ["汽車生態保險服務收入", "汽车生态保险服务收入", "汽車保險保險服務收入", "汽车保险保险服务收入"],
-    "F009": ["汽車生態綜合成本率", "汽车生态综合成本率"],
+    "B011": [
+        "汽車生態保險服務收入", "汽车生态保险服务收入",
+        "汽車保險保險服務收入", "汽车保险保险服务收入",
+        "機動車輛險保險服務收入", "機動車輛保險保險服務收入",
+        "機動車輛險保險服務收入合計", "機動車輛保險保險服務收入合計",
+    ],
+    "B017": [
+        "貨物運輸險保費收入", "貨物運輸險原保險保費收入",
+        "貨物運輸險原保費收入", "貨物運輸險保費",
+    ],
+    "F009": ["汽車生態綜合成本率", "汽车生态综合成本率",
+             "機動車輛險綜合成本率", "機動車輛保險綜合成本率",
+             "機動車輛險承保綜合成本率", "機動車輛保險承保綜合成本率"],
 }
 
 # 针对既有行的关键词剔除:
@@ -63,26 +79,35 @@ LINES = [
 ]
 
 
-def kw_metric(full: str, short: str, en: str, tf: str, ts: str, metric: str, metric_tw: str, en_metric: str) -> list[str]:
-    kws = [
-        f"{full}{metric}",
-        f"{short}{metric}",
-        f"{full}业务{metric}",
-        f"{short}业务{metric}",
-    ]
+def _label_forms(label: str) -> list[str]:
+    """险种标签变体: 保险/保險 结尾的词同时生成 险/險 结尾形式(如 机动车辆保险/机动车辆险)。"""
+    forms = [label]
+    if label.endswith("保险"):
+        forms.append(label[:-2] + "险")
+    elif label.endswith("保險"):
+        forms.append(label[:-2] + "險")
+    return forms
+
+
+def _metric_phrases(label: str, metric: str, traditional: bool) -> list[str]:
+    kws = [f"{label}{metric}", f"{label}业务{metric}"]
     if metric in ("保费", "保险服务收入", "保险服务费用"):
-        kws += [f"{full}{metric}合计", f"{short}{metric}合计"]
+        kws.append(f"{label}{metric}合计")
     if metric == "保费":
-        kws += [
-            f"{full}{metric}收入", f"{short}{metric}收入",
-            f"{full}原保险保费收入", f"{short}原保险保费收入",
-            f"{full}原保费收入", f"{short}原保费收入",
-        ]
-    kws += [
-        f"{tf}{metric_tw}", f"{ts}{metric_tw}",
-        f"{tf}業務{metric_tw}", f"{ts}業務{metric_tw}",
-        f"{en} {en_metric}",
-    ]
+        if traditional:
+            kws += [f"{label}保費收入", f"{label}原保險保費收入", f"{label}原保費收入"]
+        else:
+            kws += [f"{label}保费收入", f"{label}原保险保费收入", f"{label}原保费收入"]
+    return kws
+
+
+def kw_metric(full: str, short: str, en: str, tf: str, ts: str, metric: str, metric_tw: str, en_metric: str) -> list[str]:
+    kws: list[str] = []
+    for label in _label_forms(full) + _label_forms(short):
+        kws += _metric_phrases(label, metric, traditional=False)
+    for label in _label_forms(tf) + _label_forms(ts):
+        kws += _metric_phrases(label, metric_tw, traditional=True)
+    kws.append(f"{en} {en_metric}")
     return kws
 
 
@@ -164,6 +189,12 @@ def main() -> None:
         "意外伤害及健康保险", "意健险", "accident & health",
         "意外傷害及健康保險", "意健險",
     )
+    # 阳光等公司用词: 意外伤害和短期健康险 / 意外及短期健康险(产险短期健康)
+    yj_families = [
+        (yj_full, yj_tf),
+        ("意外伤害和短期健康险", "意外傷害和短期健康險"),
+        ("意外及短期健康险", "意外及短期健康險"),
+    ]
     yj_note = (
         "仅当年报将意外伤害保险与健康保险按'意外伤害及健康保险/意健险'合并口径披露时提取;"
         "若两者分别披露,请分别提取到'意外险''健康险'指标下,本合并指标留空。"
@@ -173,7 +204,12 @@ def main() -> None:
         (38, "保险服务收入", "保險服務收入", "insurance service revenue", "保险服务收入"),
         (39, "保险服务费用", "保險服務費用", "insurance service expenses", "保险服务费用"),
     ]:
-        kws = kw_metric(yj_full, yj_short, yj_en, yj_tf, yj_ts, metric, metric_tw, en_metric)
+        kws: list[str] = []
+        for fam_full, fam_tf in yj_families:
+            kws += kw_metric(
+                fam_full, yj_short, yj_en, fam_tf, yj_ts,
+                metric, metric_tw, en_metric,
+            )
         new_rows.append([
             f"B{bidx:03d}", "业务规模指标", f"意健险{name_suffix}",
             f"{yj_full}{metric}|{yj_short}{metric}|{yj_en} {en_metric}",
@@ -189,11 +225,13 @@ def main() -> None:
         ("承保利润", "盈利能力指标", "意健险承保利润", "百万元", "number"),
         ("综合成本率", "承保质量指标", "意健险综合成本率", "%", "percentage"),
     ]:
-        kws = kw_metric(
-            yj_full, yj_short, yj_en, yj_tf, yj_ts,
-            fmetric, "承保利潤" if "承保" in fmetric else "綜合成本率",
-            "underwriting profit" if "承保" in fmetric else "combined ratio",
-        )
+        kws = []
+        for fam_full, fam_tf in yj_families:
+            kws += kw_metric(
+                fam_full, yj_short, yj_en, fam_tf, yj_ts,
+                fmetric, "承保利潤" if "承保" in fmetric else "綜合成本率",
+                "underwriting profit" if "承保" in fmetric else "combined ratio",
+            )
         new_rows.append([
             f"F{29 if fmetric == '承保利润' else 30:03d}", category, fname,
             f"{yj_full}{fmetric}|{yj_short}{fmetric}|{yj_short}COR" if "成本" in fmetric else f"{yj_full}{fmetric}|{yj_short}{fmetric}",
